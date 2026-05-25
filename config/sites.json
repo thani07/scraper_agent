@@ -1,0 +1,242 @@
+[
+  {
+    "name": "Davis Polk",
+    "careers_url": "https://www.davispolk.com/careers/business-professionals",
+    "strategy": "workday",
+    "navigation_hints": "This page lists Business Professionals careers. Click the link to open positions or 'View Jobs' — it redirects to a Workday board (davispolk.wd5.myworkdayjobs.com). On Workday, search by keyword. Salary labelled 'Pay Range' when listed."
+  },
+  {
+    "name": "Cooley LLP",
+    "careers_url": "https://www.cooley.com/careers",
+    "strategy": "workday",
+    "navigation_hints": "Main careers page. Find the 'Professional Staff' or 'Business Professionals' section (NOT Attorneys). Click it — redirects to Workday (cooley.wd1.myworkdayjobs.com). Search by keyword on Workday."
+  },
+  {
+    "name": "Dechert",
+    "careers_url": "https://www.dechert.com/people/careers.html",
+    "strategy": "workday",
+    "navigation_hints": "Main careers page. Find the 'Professional Staff' or 'Business Services' section. Click it — redirects to Workday (dechert.wd12.myworkdayjobs.com). Search by keyword."
+  },
+  {
+    "name": "DLA Piper",
+    "careers_url": "https://www.dlapiper.com/en/careers",
+    "strategy": "workday",
+    "navigation_hints": "Main careers page. Find the 'Business Professionals' or 'Professional Staff' section (NOT Legal). Click to open positions — redirects to Workday (dlapiper.wd1.myworkdayjobs.com). Search by keyword."
+  },
+  {
+    "name": "Greenberg Traurig",
+    "careers_url": "https://www.gtlaw.com/en/careers",
+    "strategy": "workday",
+    "navigation_hints": "Main careers page. Find 'Professional Staff' or 'Business Professionals' section. Click it — redirects to Workday (gtlaw.wd1.myworkdayjobs.com). Search by keyword."
+  },
+  {
+    "name": "Hogan Lovells",
+    "careers_url": "https://www.hoganlovells.com/en/careers/business-services",
+    "strategy": "workday",
+    "navigation_hints": "Business Services careers page. Click 'Current Opportunities' or 'View Jobs' — redirects to Workday (hoganlovells.wd3.myworkdayjobs.com) pre-filtered to USA. Search by keyword."
+  },
+  {
+    "name": "Perkins Coie",
+    "careers_url": "https://www.perkinscoie.com/en/about/careers/professional-staff.html",
+    "strategy": "workday",
+    "navigation_hints": "Professional Staff careers page. Click 'Search Openings' or 'View Jobs' — redirects to Workday (perkinscoie.wd115.myworkdayjobs.com). Search by keyword."
+  },
+  {
+    "name": "Skadden",
+    "careers_url": "https://www.skadden.com/careers/staff",
+    "strategy": "workday",
+    "navigation_hints": "Staff careers page. Click 'View Open Positions' or similar — redirects to Workday (skadden.wd5.myworkdayjobs.com). Search by keyword."
+  },
+  {
+    "name": "Simpson Thacher & Bartlett",
+    "careers_url": "https://www.stblaw.com/careers/professional-staff",
+    "strategy": "workday",
+    "navigation_hints": "Professional Staff careers page. Click 'Search Open Positions' or similar — redirects to Workday (stblaw.wd1.myworkdayjobs.com). Search by keyword."
+  },
+  {
+    "name": "Holland & Knight",
+    "careers_url": "https://www.hklaw.com/en/careers/professional-staff",
+    "strategy": "workday",
+    "navigation_hints": "Professional Staff careers page. Click 'View Open Positions' — redirects to Workday (hklaw.wd1.myworkdayjobs.com) with a pre-filtered facet for staff roles. Search by keyword."
+  },
+  {
+    "name": "McDermott Will & Emery",
+    "careers_url": "https://www.mwe.com/careers/business-professionals/",
+    "strategy": "workday",
+    "navigation_hints": "Business Professionals careers page. Click 'View Open Positions' or 'Search Jobs' — redirects to Workday (mwe.wd5.myworkdayjobs.com). Staff category is 'Business Professionals'."
+  },
+  {
+    "name": "Paul Hastings",
+    "careers_url": "https://www.paulhastings.com/careers/professional-support-staff",
+    "strategy": "workday",
+    "navigation_hints": "Professional Support Staff page. Click 'Search Openings' or 'View Jobs' — redirects to Workday (paulhastings.wd1.myworkdayjobs.com/PH-Staff). Staff-only board."
+  },
+  {
+    "name": "Weil Gotshal & Manges",
+    "careers_url": "https://www.weil.com/careers/administrative-staff",
+    "strategy": "workday",
+    "navigation_hints": "Administrative Staff careers page. Click 'View Open Positions' — redirects to Workday (weil.wd1.myworkdayjobs.com). Staff category is 'Administrative Staff'."
+  },
+  {
+    "name": "Baker McKenzie",
+    "careers_url": "https://www.bakermckenzie.com/en/careers",
+    "strategy": "workday",
+    "navigation_hints": "Main careers page. Find 'Business Services' or 'Professional Staff' section. Click it — redirects to Workday. Look for Business Services / Staff category filter."
+  },
+  {
+    "name": "Baker & Hostetler",
+    "careers_url": "https://www.bakerlaw.com/careers/professional-staff",
+    "strategy": "ultipro",
+    "navigation_hints": "Professional Staff careers page. Click 'View Open Positions' — redirects to UltiPro/UKG board (recruiting.ultipro.com/BAK1005BKH). Wait for KnockoutJS to load job cards, then search. Salary in JSON-LD on detail page."
+  },
+  {
+    "name": "Hunton Andrews Kurth",
+    "careers_url": "https://www.hunton.com/en/careers/us-professional-staff.html",
+    "strategy": "ultipro",
+    "navigation_hints": "US Professional Staff page. Click portal link or 'Apply Now' — redirects to UltiPro board (recruiting.ultipro.com/HUN1002HW). Staff category is 'US Professional Staff'."
+  },
+  {
+    "name": "Polsinelli",
+    "careers_url": "https://www.polsinelli.com/careers",
+    "strategy": "ultipro",
+    "navigation_hints": "Main careers page. Find 'Staff Openings' section. Click it — redirects to UltiPro board (recruiting.ultipro.com/POL1004PLNI). Wait for KnockoutJS cards to load, then search."
+  },
+  {
+    "name": "Kirkland & Ellis",
+    "careers_url": "https://www.kirkland.com/content/staff-careers",
+    "strategy": "icims",
+    "navigation_hints": "Staff careers page. Click 'View Open Positions' — redirects to an iCIMS portal (staffjobsus.kirkland.com). All content is inside an iframe. Keyword search is available."
+  },
+  {
+    "name": "Willkie Farr & Gallagher",
+    "careers_url": "https://www.willkie.com/careers/professional-staff",
+    "strategy": "icims",
+    "navigation_hints": "Professional Staff careers page. Click 'View Open Positions' — redirects to an iCIMS portal (jobs-willkie.icims.com). All content is inside #icims_content_iframe. Search by keyword."
+  },
+  {
+    "name": "Foley & Lardner",
+    "careers_url": "https://www.foley.com/en/careers",
+    "strategy": "icims",
+    "navigation_hints": "Main careers page. Find 'Professional Staff' or 'Business Services' section. Click to view jobs — redirects to iCIMS portal (careers-foley.icims.com). All content inside iframe."
+  },
+  {
+    "name": "Milbank",
+    "careers_url": "https://www.milbank.com/careers/",
+    "strategy": "icims",
+    "navigation_hints": "Main careers page. Find 'Professional Staff' or 'Business Staff' section. Click it — redirects to iCIMS portal (careers-milbank.icims.com). All content inside iframe. Search by keyword."
+  },
+  {
+    "name": "Cleary Gottlieb",
+    "careers_url": "https://www.clearygottlieb.com/careers/staff-opportunities",
+    "strategy": "icims",
+    "navigation_hints": "Staff opportunities page. Click 'View Open Positions' — redirects to iCIMS portal (careers-clearygottlieb.icims.com). Content inside iframe. Category 'Administrative' (id 8718) = staff roles."
+  },
+  {
+    "name": "Orrick",
+    "careers_url": "https://www.orrick.com/Careers/Staff",
+    "strategy": "icims",
+    "navigation_hints": "Staff careers page. Click 'View Open Positions' or jobs link — redirects to iCIMS Talent Cloud (talent.orrick.com/staff-us/jobs). This is a modern React SPA — NO iframe needed. Interact with the page directly."
+  },
+  {
+    "name": "Latham & Watkins",
+    "careers_url": "https://www.lw.com/en/careers/professional-staff",
+    "strategy": "icims",
+    "navigation_hints": "Professional Staff careers page. Click 'View Open Positions' — redirects to iCIMS portal (us-associatecareers-lw.icims.com). Content inside iframe. Search by keyword."
+  },
+  {
+    "name": "Jones Day",
+    "careers_url": "https://www.jonesday.com/en/careers/staff-careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Staff careers page. Click 'Search Staff Openings' or 'View Positions' — redirects to viDesktop portal (viglobalcloud.com/viRecruitSelfApply). ASP.NET grid of jobs. Search triggers full page postback. Capture RecJobView.aspx URL BEFORE clicking apply."
+  },
+  {
+    "name": "Baker Botts",
+    "careers_url": "https://www.bakerbotts.com/careers/professional-staff",
+    "strategy": "videsktop",
+    "navigation_hints": "Professional Staff page. Click 'View Open Positions' — redirects to viDesktop portal (bakerbottsselfapply.viglobalcloud.com). FilterJobCategoryID=3 = IP Professional Staff. ASP.NET grid. Capture RecJobView.aspx URL BEFORE clicking apply."
+  },
+  {
+    "name": "Brownstein Hyatt Farber Schreck",
+    "careers_url": "https://www.bhfs.com/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Find 'Professional Staff' section. Click it — redirects to viDesktop portal (apply.bhfs.com/viRecruitSelfApply). FilterREID=3 = Professional Staff (permanent). ASP.NET grid, search box: #contentPlaceHolder_textKeyWord."
+  },
+  {
+    "name": "Reed Smith",
+    "careers_url": "https://www.reedsmith.com/en/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Find 'Professional Staff' or 'Business Services' section. Click portal link — redirects to viDesktop (recruiter.reedsmith.com). May need to click 'External Self Apply'. ASP.NET grid. Capture RecJobView.aspx URL BEFORE clicking apply."
+  },
+  {
+    "name": "Winston & Strawn",
+    "careers_url": "https://www.winston.com/en/careers/business-professionals",
+    "strategy": "videsktop",
+    "navigation_hints": "Business Professionals page. Click the portal link or 'Apply' — redirects to viDesktop (winstonstrawncareers.viglobalcloud.com). ASP.NET grid. Search triggers postback. Capture RecJobView.aspx URL BEFORE clicking apply."
+  },
+  {
+    "name": "O'Melveny & Myers",
+    "careers_url": "https://www.omm.com/careers/business-professionals/",
+    "strategy": "videsktop",
+    "navigation_hints": "Business Professionals page. Click 'Apply' dropdown or portal link — redirects to viDesktop (ommcareers.viglobalcloud.com). ASP.NET grid. Search triggers postback. Capture RecJobView.aspx URL BEFORE clicking apply."
+  },
+  {
+    "name": "Loeb & Loeb",
+    "careers_url": "https://www.loeb.com/en/careers",
+    "strategy": "florecruit",
+    "navigation_hints": "Main careers page. Find 'Open Positions' or 'Join Our Team' section. Click it — redirects to FLO Recruit (florecruit.com/v2/app/loeb/jobs). React SPA, all jobs are staff roles, scroll through cards to find the role."
+  },
+  {
+    "name": "Holland & Hart",
+    "careers_url": "https://www.hollandhart.com/careers",
+    "strategy": "florecruit",
+    "navigation_hints": "Main careers page. Find 'Open Positions' or staff jobs link. Click it — redirects to FLO Recruit (florecruit.com/v2/app/hollandhart/jobs). React SPA, scroll through cards."
+  },
+  {
+    "name": "Dickinson Wright",
+    "careers_url": "https://www.dickinsonwright.com/careers",
+    "strategy": "florecruit",
+    "navigation_hints": "Main careers page. Find staff jobs link or 'Open Positions'. Click it — redirects to FLO Recruit (florecruit.com/v2/app/dickinsonwright/jobs). React SPA, scroll through cards."
+  },
+  {
+    "name": "Winstead",
+    "careers_url": "https://www.winstead.com/Careers",
+    "strategy": "florecruit",
+    "navigation_hints": "Main careers page. Find staff jobs link or 'Current Openings'. Click it — redirects to FLO Recruit (florecruit.com/v2/app/winstead/jobs). React SPA, scroll through cards."
+  },
+  {
+    "name": "Akin Gump",
+    "careers_url": "https://www.akingump.com/en/careers/business-services",
+    "strategy": "direct",
+    "navigation_hints": "Business Services careers page. Click 'View Open Positions' — redirects to SilkRoad ATS (jobs.silkroad.com/AkinGump). Static HTML page, all jobs listed without pagination. Scan all job cards (.sr-panel__title) for the role. Salary in description prose."
+  },
+  {
+    "name": "Covington & Burling",
+    "careers_url": "https://www.cov.com/en/careers/business-professionals",
+    "strategy": "direct",
+    "navigation_hints": "Business Professionals careers page. Click 'Employment Opportunities' or 'View Jobs' — leads to a Coveo search-powered SPA. Job cards use class .search-results-card. Location shown after 'Office:' label. Some detail pages are PDFs — extract text if so."
+  },
+  {
+    "name": "Shook Hardy & Bacon",
+    "careers_url": "https://www.shb.com/about/careers",
+    "strategy": "direct",
+    "navigation_hints": "Main careers page. Find 'Professional Staff' section. Click it — redirects to ADP job board (myjobs.adp.com/shook-careers). Angular app, wait for page to hydrate before interacting. URL is already scoped to Professional Staff."
+  },
+  {
+    "name": "Gibson Dunn",
+    "careers_url": "https://www.gibsondunn.com/careers/",
+    "strategy": "direct",
+    "navigation_hints": "Wizard-based careers page: navigate Office → Practice Area → Positions. Find 'Business Operations' or 'Professional Staff' path. Do NOT go into attorney positions."
+  },
+  {
+    "name": "Alston & Bird",
+    "careers_url": "https://www.alston.com/en/careers/staff-opportunities",
+    "strategy": "direct",
+    "navigation_hints": "Staff opportunities page. Jobs listed as static HTML. Scroll through the page to find the role. Click the job title to open the detail page. Salary in description prose."
+  },
+  {
+    "name": "KPMG",
+    "careers_url": "https://kpmg.com/us/en.html",
+    "strategy":"direct",
+    "navigation_hints": "Main page. Click 'Careers' in the header, then 'Search Jobs'. This leads to a search page with filters. Use the keyword search to find and fetch the salary ."
+  }
+]

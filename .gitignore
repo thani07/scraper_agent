@@ -1,0 +1,22 @@
+# Environment variables — contains API keys, never commit these
+.env
+.env.example
+
+# Python virtual environment
+venv_311/
+
+# Claude Code session data
+.claude/
+
+# Scrape logs and GIF recordings
+logs/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
