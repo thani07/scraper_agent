@@ -39,20 +39,43 @@ def get_llm():
         )
 
 
+class _NoiseFilter:
+    """
+    Stdout wrapper that drops browser_use's internal separator lines.
+    Those lines consist entirely of '=' or '-' characters (e.g. 80x '=').
+    They add no information and flood the Azure Functions log.
+    """
+    def __init__(self, wrapped):
+        self._wrapped = wrapped
+
+    def write(self, text: str):
+        stripped = text.strip()
+        # Drop lines that are purely separator characters and longer than 10 chars
+        if stripped and len(stripped) > 10 and all(c in "=-*" for c in stripped):
+            return
+        self._wrapped.write(text)
+
+    def flush(self):
+        self._wrapped.flush()
+
+    def __getattr__(self, name):
+        return getattr(self._wrapped, name)
+
+
 def make_step_callback(firm_name: str, last_url_container: list, verbose: bool = False):
     """
-    Returns an async step callback that:
-      - Always tracks the last non-blank URL the agent visits (used as job_url fallback)
-      - Prints detailed action logs only when verbose=True
+    Returns an async step callback.
 
-    Called by Browser-Use after every step with:
-      browser_state_summary  — current page state
-      model_output           — what the LLM decided to do (actions list)
-      step_number            — current step index
+    Always:
+      - Tracks the last non-blank URL (job_url fallback)
+      - Prints one concise line per step showing action + goal
+
+    When VERBOSE_ACTIONS=true:
+      - Also prints current URL and full thought text
     """
 
     async def on_step(browser_state_summary, model_output, step_number: int):
-        # Always track the current URL so we have a better fallback than site.careers_url
+        # Always track current URL for job_url fallback
         try:
             url = browser_state_summary.url
             if url and url not in ("about:blank", ""):
@@ -60,42 +83,59 @@ def make_step_callback(firm_name: str, last_url_container: list, verbose: bool =
         except Exception:
             pass
 
-        if not verbose:
+        if not model_output:
             return
 
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        print(f"\n[{firm_name}] Step {step_number} @ {timestamp}")
+        # Extract action name and goal for the one-liner
+        action_name = ""
+        action_val  = ""
+        goal        = ""
 
-        # Current URL
         try:
-            url = browser_state_summary.url
-            print(f"  URL    : {url}")
+            if hasattr(model_output, "current_state"):
+                state = model_output.current_state
+                if hasattr(state, "next_goal") and state.next_goal:
+                    goal = state.next_goal.strip()[:100]
         except Exception:
             pass
 
-        # What the LLM is thinking / doing
-        if model_output:
-            try:
-                if hasattr(model_output, "current_state"):
-                    state = model_output.current_state
-                    if hasattr(state, "thought") and state.thought:
-                        print(f"  Think  : {state.thought[:200]}")
-                    if hasattr(state, "next_goal") and state.next_goal:
-                        print(f"  Goal   : {state.next_goal[:200]}")
-            except Exception:
-                pass
+        try:
+            actions = model_output.action if hasattr(model_output, "action") else []
+            for action in (actions or []):
+                action_dict = action.model_dump(exclude_none=True)
+                for key, val in action_dict.items():
+                    if key != "type":
+                        action_name = key
+                        action_val  = str(val)[:60] if val else ""
+                        break
+                if action_name:
+                    break
+        except Exception:
+            pass
 
-            try:
-                actions = model_output.action if hasattr(model_output, "action") else []
-                for i, action in enumerate(actions or []):
-                    action_dict = action.model_dump(exclude_none=True)
-                    for key, val in action_dict.items():
-                        if val is not None and key != "type":
-                            val_str = str(val)[:120]
-                            print(f"  Action : {key}({val_str})")
-                            break
-            except Exception:
-                pass
+        # One-liner per step — always printed
+        if action_name or goal:
+            action_part = f"{action_name}({action_val})" if action_name else ""
+            goal_part   = f'  ->  "{goal}"'              if goal        else ""
+            print(f"  [{firm_name}] Step {step_number:>2} | {action_part}{goal_part}")
+
+        if not verbose:
+            return
+
+        # Full verbose output — only when VERBOSE_ACTIONS=true
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        try:
+            url = browser_state_summary.url
+            print(f"    URL  : {url} @ {timestamp}")
+        except Exception:
+            pass
+        try:
+            if hasattr(model_output, "current_state"):
+                state = model_output.current_state
+                if hasattr(state, "thought") and state.thought:
+                    print(f"    Think: {state.thought[:300]}")
+        except Exception:
+            pass
 
     return on_step
 
@@ -674,6 +714,11 @@ async def scrape_site(site: SiteConfig, role: str, search_terms: list[str] | Non
                 print(f"  Log     : {convo_path}")
             print(f"{'='*60}")
 
+        # Suppress browser_use's internal separator-line noise while the agent runs.
+        # The _NoiseFilter drops lines made entirely of '=' or '-' characters.
+        import sys as _sys
+        _orig_stdout = _sys.stdout
+        _sys.stdout  = _NoiseFilter(_sys.stdout)
         try:
             result = await asyncio.wait_for(
                 agent.run(max_steps=max_steps),
@@ -691,6 +736,8 @@ async def scrape_site(site: SiteConfig, role: str, search_terms: list[str] | Non
                     print(f"  [WARN] GIF generation failed: {agent_err}")
             else:
                 raise agent_err
+        finally:
+            _sys.stdout = _orig_stdout
 
         # Extract structured output
         # result may be AgentHistoryList or AgentState depending on error recovery path
