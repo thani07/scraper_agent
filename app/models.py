@@ -30,9 +30,11 @@ class SiteConfig(BaseModel):
 class JobExtraction(BaseModel):
     """Schema the LLM agent extracts from each job listing page."""
     role_title: str = Field(description="Exact job title as shown on the page")
+    description: Optional[str] = Field(default=None, description="2-4 sentence summary of the role's responsibilities and purpose")
     salary_min: Optional[str] = Field(default=None, description="Minimum salary or base pay (e.g. '$180,000')")
     salary_max: Optional[str] = Field(default=None, description="Maximum salary or top of range (e.g. '$220,000')")
     salary_raw: Optional[str] = Field(default=None, description="Raw salary text as displayed on page if structured min/max not available")
+    is_hourly: Optional[bool] = Field(default=None, description="True if salary is listed as an hourly rate; omit or null if annual/not listed")
     experience_years: Optional[str] = Field(default=None, description="Years of experience required (e.g. '5-7 years')")
     experience_raw: Optional[str] = Field(default=None, description="Raw experience text as displayed on page")
     location: Optional[str] = Field(default=None, description="Job location (city, state or remote)")

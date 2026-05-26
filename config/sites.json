@@ -147,37 +147,37 @@
     "name": "Jones Day",
     "careers_url": "https://www.jonesday.com/en/careers/staff-careers",
     "strategy": "videsktop",
-    "navigation_hints": "Staff careers page. Click 'Search Staff Openings' or 'View Positions' — redirects to viDesktop portal (viglobalcloud.com/viRecruitSelfApply). ASP.NET grid of jobs. Search triggers full page postback. Capture RecJobView.aspx URL BEFORE clicking apply."
+    "navigation_hints": "Portal: jonesdaystaffrecruitselfapply.viglobalcloud.com. Link texts to try: 'Search Staff Openings', 'View Positions', 'Career Opportunities'. Tag-based URL — may expire; do organic discovery if grid is empty. Grid ID: #contentPlaceHolder_gridviewList."
   },
   {
     "name": "Baker Botts",
     "careers_url": "https://www.bakerbotts.com/careers/professional-staff",
     "strategy": "videsktop",
-    "navigation_hints": "Professional Staff page. Click 'View Open Positions' — redirects to viDesktop portal (bakerbottsselfapply.viglobalcloud.com). FilterJobCategoryID=3 = IP Professional Staff. ASP.NET grid. Capture RecJobView.aspx URL BEFORE clicking apply."
+    "navigation_hints": "Portal: bakerbottsselfapply.viglobalcloud.com. Link text: 'View Open Positions'. FilterJobCategoryID=3 = IP Professional Staff (permanent filter). Grid ID: #contentPlaceHolder_gridviewList."
   },
   {
     "name": "Brownstein Hyatt Farber Schreck",
     "careers_url": "https://www.bhfs.com/careers",
     "strategy": "videsktop",
-    "navigation_hints": "Main careers page. Find 'Professional Staff' section. Click it — redirects to viDesktop portal (apply.bhfs.com/viRecruitSelfApply). FilterREID=3 = Professional Staff (permanent). ASP.NET grid, search box: #contentPlaceHolder_textKeyWord."
+    "navigation_hints": "Portal: apply.bhfs.com/viRecruitSelfApply. FilterREID=3 (permanent, never expires). Link text: 'Professional Staff'. Grid ID: #contentPlaceHolder_gridviewList. Search box: #contentPlaceHolder_textKeyWord. Search button: #contentPlaceHolder_buttonSearch."
   },
   {
     "name": "Reed Smith",
-    "careers_url": "https://www.reedsmith.com/en/careers",
+    "careers_url": "https://recruiter.reedsmith.com/",
     "strategy": "videsktop",
-    "navigation_hints": "Main careers page. Find 'Professional Staff' or 'Business Services' section. Click portal link — redirects to viDesktop (recruiter.reedsmith.com). May need to click 'External Self Apply'. ASP.NET grid. Capture RecJobView.aspx URL BEFORE clicking apply."
+    "navigation_hints": "Entry URL: recruiter.reedsmith.com. Link text: 'External Self Apply'. Extract that link's href and navigate to it directly with go_to_url (avoids new-tab issues). Portal: recruiter.reedsmith.com/viRecruitSelfApply. Tag-based URL. Grid ID: #contentPlaceHolder_gridviewList."
   },
   {
     "name": "Winston & Strawn",
     "careers_url": "https://www.winston.com/en/careers/business-professionals",
     "strategy": "videsktop",
-    "navigation_hints": "Business Professionals page. Click the portal link or 'Apply' — redirects to viDesktop (winstonstrawncareers.viglobalcloud.com). ASP.NET grid. Search triggers postback. Capture RecJobView.aspx URL BEFORE clicking apply."
+    "navigation_hints": "Portal: winstonstrawncareers.viglobalcloud.com. Link text: 'search and apply for available positions' or 'Available Positions'. FilterREID=3&FilterJobCategoryID=10 (permanent). Extract link href and navigate directly. Grid ID: #contentPlaceHolder_gridviewList."
   },
   {
     "name": "O'Melveny & Myers",
     "careers_url": "https://www.omm.com/careers/business-professionals/",
     "strategy": "videsktop",
-    "navigation_hints": "Business Professionals page. Click 'Apply' dropdown or portal link — redirects to viDesktop (ommcareers.viglobalcloud.com). ASP.NET grid. Search triggers postback. Capture RecJobView.aspx URL BEFORE clicking apply."
+    "navigation_hints": "Portal: ommcareers.viglobalcloud.com. Link text: 'Apply Online' or 'Career Opportunities'. Tag-based URL. Extract link href and navigate directly with go_to_url. Grid ID: #contentPlaceHolder_gridviewList."
   },
   {
     "name": "Loeb & Loeb",

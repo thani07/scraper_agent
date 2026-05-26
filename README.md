@@ -1,60 +1,38 @@
 # HR Salary Scraper
 
-AI-powered job data extraction from 200+ law firm career sites using **Browser-Use** + **LLM agents**.
+AI-powered salary and job data extraction from law firm career sites using **Browser-Use** + **Azure OpenAI**.
 
-Replaces 200 individual Playwright scraper files with **5 strategy templates** + **1 site config JSON**.
+Supports 20+ viDesktop (VI Recruit) portals with concurrent browser sessions.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│                   main.py (CLI)                 │
-│         --role "Associate" --sites all           │
-└──────────────────────┬──────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────┐
-│              config/sites.json                   │
-│   200 entries: {name, url, strategy, hints}      │
-└──────────────────────┬──────────────────────────┘
-                       │
-          ┌────────────┼────────────┐
-          ▼            ▼            ▼
-   ┌──────────┐ ┌──────────┐ ┌──────────┐
-   │ Workday  │ │Greenhouse│ │  Direct  │  ... (5 strategies)
-   │ Strategy │ │ Strategy │ │ Strategy │
-   └────┬─────┘ └────┬─────┘ └────┬─────┘
-        │             │             │
-        └─────────────┼─────────────┘
-                      ▼
-┌─────────────────────────────────────────────────┐
-│              Browser-Use Agent                   │
-│  initial_actions (Playwright, FREE) ──►          │
-│  extraction_task (LLM, structured output) ──►    │
-│  Pydantic JobExtraction model                    │
-└──────────────────────┬──────────────────────────┘
-                       │
-              ┌────────┼────────┐
-              ▼                 ▼
-    ┌──────────────┐   ┌──────────────┐
-    │ Local JSON   │   │  Cosmos DB   │
-    │ results.json │   │  job_cache   │
-    └──────────────┘   └──────────────┘
+main.py  (ENV-driven entry point)
+    │
+    ├── generate_search_terms()   — one LLM call generates 4-5 role alternatives
+    │
+    └── run_batch()               — asyncio.Semaphore(CONCURRENCY) concurrent sessions
+            │
+            └── scrape_site()     — per-firm isolated browser (unique Chrome profile)
+                    │
+                    └── ViDesktopStrategy  — full prompt: search all terms, extract salary/URL
+                            │
+                            └── JobExtraction model
+                                    role_title, description,
+                                    salary_min, salary_max, salary_raw, is_hourly,
+                                    experience_years, location, job_url, practice_area
 ```
 
-## Setup
+## Quick Start (Local)
 
-### 1. Clone & create virtualenv
+### 1. Clone and create virtualenv
 
 ```bash
-cd hr-salary-scraper
+git clone https://github.com/thani07/scraper_agent.git
+cd scraper_agent
 python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# Mac/Linux
-source venv/bin/activate
+# Windows:  venv\Scripts\activate
+# Mac/Linux: source venv/bin/activate
 ```
 
 ### 2. Install dependencies
@@ -70,141 +48,128 @@ playwright install chromium
 cp .env.example .env
 ```
 
-Edit `.env` and add your LLM key:
+Edit `.env` — at minimum set your Azure OpenAI credentials and `ROLE`:
 
 ```env
-# For OpenAI direct (GPT-5.4 or whatever model you have):
-OPENAI_API_KEY=sk-your-key-here
-OPENAI_MODEL=gpt-4o-mini
-
-# For Azure OpenAI (uncomment in .env):
-# USE_AZURE=true
-# AZURE_OPENAI_API_KEY=your-key
-# AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-# AZURE_OPENAI_DEPLOYMENT=your-deployment-name
-# AZURE_OPENAI_API_VERSION=2024-12-01-preview
+AZURE_OPENAI_API_KEY=your-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.cognitiveservices.azure.com/
+AZURE_OPENAI_DEPLOYMENT=your-deployment-name
+ROLE=business professional
 ```
 
-## Run Commands
+### 4. Run
 
-### Scrape all 5 test sites for a role
 ```bash
-python main.py --role "Associate Attorney"
+python main.py
 ```
 
-### Scrape a specific firm
+All settings are read from `.env`. CLI args are optional overrides:
+
 ```bash
-python main.py --role "Paralegal" --sites "Kirkland"
+python main.py --role "paralegal" --strategy videsktop
+python main.py --role "analyst"   --filter "Jones Day"
 ```
 
-### Run sequentially (easier to debug)
+## Key Settings (`.env`)
+
+| Variable | Default | Description |
+|---|---|---|
+| `ROLE` | *(required)* | Role to search across all firms |
+| `STRATEGY` | `videsktop` | `videsktop` or `all` |
+| `CONCURRENCY` | `5` | Parallel browser sessions |
+| `SITE_FILTER` | `all` | Narrow to one firm by name substring |
+| `SCRAPE_TIMEOUT` | `300` | Seconds before a firm is aborted |
+| `HEADLESS` | `true` | `false` to watch the browser locally |
+| `STORAGE` | `local` | `local` (results.json) or `cosmos` |
+| `OUTPUT_FILE` | `output.txt` | Plain-text results file |
+
+## Deploy to Azure
+
+### Option A — Azure Container Instances (recommended for on-demand runs)
+
 ```bash
-python main.py --role "Corporate Associate" --single
+# 1. Build and push image
+az acr build --registry <your-acr> --image hr-scraper:latest .
+
+# 2. Run a job
+az container create \
+  --resource-group <rg> \
+  --name hr-scraper-run \
+  --image <your-acr>.azurecr.io/hr-scraper:latest \
+  --environment-variables \
+      AZURE_OPENAI_API_KEY=<key> \
+      AZURE_OPENAI_ENDPOINT=<endpoint> \
+      AZURE_OPENAI_DEPLOYMENT=<deployment> \
+      ROLE="business professional" \
+      STRATEGY=videsktop \
+      CONCURRENCY=5 \
+      STORAGE=cosmos \
+      COSMOS_ENDPOINT=<cosmos-endpoint> \
+      COSMOS_KEY=<cosmos-key> \
+      COSMOS_DATABASE=hr-scraper \
+      COSMOS_CONTAINER=job-results \
+  --restart-policy Never \
+  --cpu 2 --memory 4
 ```
 
-### Run with visible browser (not headless)
-```bash
-# Set in .env: HEADLESS=false
-python main.py --role "Associate Attorney" --single
-```
+### Option B — Azure Container Apps (HTTP-triggered or scheduled)
 
-### Save to Cosmos DB instead of local JSON
-```bash
-python main.py --role "Associate Attorney" --storage cosmos
-```
+Deploy the image to Container Apps and pass all secrets via Container Apps secrets / environment variables. Set `HEADLESS=true` (default in Dockerfile).
 
-## How It Works
+### Important for Azure
 
-### The Strategy Pattern
-
-Instead of 200 separate scraper files, each site has a `strategy` type in `config/sites.json`:
-
-| Strategy    | Used For                        | Navigation          | Extraction       |
-|-------------|--------------------------------|---------------------|------------------|
-| `workday`   | Workday ATS sites              | Search box → Click  | LLM reads detail |
-| `greenhouse`| Greenhouse boards              | Scan list → Click   | LLM reads detail |
-| `icims`     | iCIMS portals                  | Keyword search      | LLM reads detail |
-| `lever`     | Lever job boards               | Scan by dept        | LLM reads detail |
-| `direct`    | Custom career pages            | Full LLM explore    | LLM reads detail |
-
-### Cost Optimization
-
-- **Navigation**: Done via `initial_actions` (plain Playwright) = **FREE**
-- **Extraction**: Done via LLM agent = costs tokens but only for the final page
-- **Result**: ~80% cheaper than sending every page to the LLM
-
-### Adding New Sites
-
-Edit `config/sites.json`:
-
-```json
-{
-  "name": "Skadden Arps",
-  "careers_url": "https://www.skadden.com/careers",
-  "strategy": "direct",
-  "navigation_hints": "Has separate Lawyer and Staff sections"
-}
-```
-
-That's it. No new Python file needed.
-
-### Adding a New Strategy
-
-1. Create `app/strategies/my_new_ats.py` (copy from `direct.py`)
-2. Add to `ATSStrategy` enum in `app/models.py`
-3. Register in `app/strategies/__init__.py`
+- `HEADLESS=true` is forced in the Dockerfile — containers have no display
+- Pass all secrets as environment variables or Azure Key Vault references — never commit `.env`
+- For `STORAGE=cosmos`, set all `COSMOS_*` variables
+- Recommended: 2 vCPU / 4 GB RAM for `CONCURRENCY=5`
 
 ## Output
 
-### Console Output
+### Console (live as each firm finishes)
+
 ```
-✅  Kirkland & Ellis (direct)
-   Role searched: Associate Attorney
-   Duration: 45.2s
-   Title: Corporate Associate
-   Salary: $215,000 — $235,000
-   Experience: 3-5 years
-   Location: New York, NY
-   URL: https://www.kirkland.com/careers/associate-12345
+  [OK ] [ 1/21] Jones Day          --  3 job(s)  (47s)
+  [---] [ 2/21] Thompson Hine      --  0 job(s)  (38s)
+  [ERR] [ 3/21] Brown Rudnick      --  0 job(s)  (12s)
 ```
 
-### results.json
-```json
-{
-  "firm_name": "Kirkland & Ellis",
-  "strategy_used": "direct",
-  "role_searched": "Associate Attorney",
-  "extraction": {
-    "role_title": "Corporate Associate",
-    "salary_min": "$215,000",
-    "salary_max": "$235,000",
-    "salary_raw": null,
-    "experience_years": "3-5 years",
-    "location": "New York, NY",
-    "job_url": "https://www.kirkland.com/careers/associate-12345",
-    "practice_area": "Corporate"
-  },
-  "status": "success",
-  "scrape_duration_sec": 45.2
-}
+### output.txt
+
+```
+[FOUND]  Jones Day  --  3 job(s)  (47s)
+    --------------------------------------------------
+    Title      : Business Development Manager
+    Description: Manages client relationships and BD initiatives across practice groups...
+    Salary Min : $120,000
+    Salary Max : $150,000
+    Salary Raw : The salary range for this role is $120,000 – $150,000 annually.
+    Experience : 5-7 years
+    Location   : New York, NY
+    Department : Business Development
+    URL        : https://jonesdaystaffrecruitselfapply.viglobalcloud.com/viRecruitSelfApply/RecApplicantEmail.aspx?Tag=...
 ```
 
-## Scaling to 200 Sites
+## Project Structure
 
-Once the 5 test sites work:
-
-1. Add all 200 entries to `config/sites.json`
-2. Identify each site's ATS type (most AmLaw firms use Workday/Greenhouse/iCIMS)
-3. Set `MAX_CONCURRENT=5` in `.env` for parallel runs
-4. Use `--storage cosmos` to push results to your existing Cosmos DB
-5. Wrap `main.py` in your Azure Function App timer trigger for scheduled runs
-
-## Troubleshooting
-
-| Issue | Fix |
-|-------|-----|
-| `playwright install` fails | Run `python -m playwright install chromium` |
-| Timeout on a site | Increase `SCRAPE_TIMEOUT` in `.env` |
-| LLM returns garbage | Set `HEADLESS=false` and run `--single` to watch the browser |
-| Cosmos DB auth error | Check `COSMOS_ENDPOINT` and `COSMOS_KEY` in `.env` |
-| Rate limited by site | Lower `MAX_CONCURRENT` to 1-2 |
+```
+hr-salary-scraper/
+├── main.py                        # Entry point (ENV-driven)
+├── requirements.txt
+├── Dockerfile                     # Production container
+├── .env.example                   # Safe config template
+├── app/
+│   ├── models.py                  # SiteConfig, JobExtraction, ScrapeResult
+│   ├── scraper.py                 # scrape_site(), generate_search_terms()
+│   ├── storage.py                 # LocalStorage, CosmosStorage
+│   └── strategies/
+│       ├── videsktop.py           # VI Recruit / ViDesktop portals
+│       ├── workday.py
+│       ├── greenhouse.py
+│       ├── icims.py
+│       ├── lever.py
+│       ├── direct.py
+│       └── base.py
+└── config/
+    ├── videsktop_firms.json       # 21 viDesktop law firm sites
+    └── sites.json                 # All firms across all strategies
+```

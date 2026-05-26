@@ -1,0 +1,128 @@
+[
+  {
+    "name": "Weil, Gotshal & Manges",
+    "careers_url": "https://www.weil.com/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Scan all hrefs on the page for 'selfapply.weil.com' — the link leads directly to the viDesktop portal (selfapply.weil.com/viRecruitSelfApply/RecDefault.aspx). If the Tag URL expires, return to this page and re-discover. On the portal, use #contentPlaceHolder_gridviewList grid. Search by keyword via #contentPlaceHolder_textKeyWord. Capture each row href (RecJobView preferred) BEFORE clicking — doPostBack navigation does not change page.url. Apply link is in td.rptAction a[id*='linkButtonApply']."
+  },
+  {
+    "name": "Reed Smith",
+    "careers_url": "https://www.reedsmith.com/en/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Scan hrefs for 'recruiter.reedsmith.com' — this is the self-hosted viDesktop portal. Alternatively navigate directly to recruiter.reedsmith.com and click the 'External Self Apply' link (entry_url pattern). If the link opens a new tab, close it and redirect main page to the new tab URL. Portal grid: #contentPlaceHolder_gridviewList. Tag URL: recruiter.reedsmith.com/viRecruitSelfApply/RecDefault.aspx?Tag=... — re-discover from careers page if expired. Capture row href before clicking."
+  },
+  {
+    "name": "Winston & Strawn",
+    "careers_url": "https://www.winston.com/en/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Navigate to the Business Professionals sub-page at /en/careers/business-professionals. Click 'Available Positions' button — this navigates to or links to the viglobalcloud portal. Scan hrefs for 'winstonstrawncareers.viglobalcloud.com'. Uses permanent FilterREID=3&FilterJobCategoryID=10 URL (never expires — no Tag). On the portal, fill #contentPlaceHolder_textKeyWord and press Enter to filter by role. Salary may appear in 'minimum of $X ... maximum of $Y' prose format — extract both values."
+  },
+  {
+    "name": "Paul Hastings",
+    "careers_url": "https://www.paulhastings.com/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Scan hrefs for 'jobs.phextranet.com' — this is a self-hosted viDesktop portal at jobs.phextranet.com/PH-Attorney/viRecruitSelfApply/ReDefault.aspx (note: ReDefault not RecDefault). Tag-based URL. Re-discover from careers page if expired. Grid: #contentPlaceHolder_gridviewList. Salary often stated as prose ('minimum of $X ... maximum of $Y') — apply prose salary regex. Capture row href before clicking."
+  },
+  {
+    "name": "Blank Rome",
+    "careers_url": "https://www.blankrome.com/careers/overview/business-professionals/",
+    "strategy": "videsktop",
+    "navigation_hints": "Business Professionals careers page. SPECIAL STRATEGY: All job listings are displayed inline on this page as anchor links in format 'Job Title | City, ST' or 'Job Title | City, ST; City2, ST2'. Each href points to careers.blankrome.com/Applicant/viRecruitSelfApply/RecDefault.aspx?FilterREID=7&FilterJobCategoryID=X&FilterJobID=N. Step 1: Scrape all matching job links from the page — extract title and location from link text (split on '|'). Step 2: For each matched job, visit the FilterJobID URL which redirects to RecApplicantEmail.aspx — extract salary and experience from that page. DO NOT use the viDesktop grid (#contentPlaceHolder_gridviewList) as the primary listing — the firm's own careers page is the authoritative source for all postings (the grid only shows ~3 partial results). Permanent board URL: careers.blankrome.com/...?FilterREID=7."
+  },
+  {
+    "name": "Dorsey & Whitney",
+    "careers_url": "https://www.dorsey.com/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. First dismiss the OneTrust cookie banner by clicking '#onetrust-accept-btn-handler'. Then navigate directly to the Business Professionals/Staff sub-page at https://www.dorsey.com/careers/staff (do not click — the SPA routing blocks click_text navigation). On the staff page, scan hrefs for 'recruiting.dorsey.com' — the 'View Current Openings' button links to the viDesktop portal (recruiting.dorsey.com/viRecruitSelfApply/RecDefault.aspx?Tag=...). Tag-based URL — re-discover from careers/staff if expired. Grid: #contentPlaceHolder_gridviewList."
+  },
+  {
+    "name": "Brown Rudnick",
+    "careers_url": "https://brownrudnick.com/careers/business-professionals/",
+    "strategy": "videsktop",
+    "navigation_hints": "Business Professionals careers page. Job openings are hidden inside collapsed accordion sections. First expand ALL accordion toggles by clicking every element matching 'button[aria-expanded], button.accordion__toggle, [class*=\"accordion\"] button, button:has-text(\"+\")' — scroll each into view before clicking, wait 350ms between each. After expansion, scan all hrefs for 'brownrudnickcareers.viglobalcloud.com'. Strip '&FilterJobID=N' and '&FilterJobCategoryID=N' from the found href to get the board-level URL. Permanent URL: brownrudnickcareers.viglobalcloud.com/viRecruitSelfApply/RecDefault.aspx?FilterREID=3&FilterJobCategoryID=1 (never expires)."
+  },
+  {
+    "name": "Armstrong Teasdale",
+    "careers_url": "https://www.armstrongteasdale.com/careers/",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Multi-step navigation: (1) goto https://www.armstrongteasdale.com/careers/business-professionals/ — the Business Professionals sub-page. (2) goto https://www.armstrongteasdale.com/careers/current-openings/?office=all&position=professional-staff — the Current Openings filtered view. (3) Scan hrefs for 'armstrongteasdale-careers.viglobalcloud.com' — 'Openings for Business Professionals' link leads to the portal. Permanent URL: armstrongteasdale-careers.viglobalcloud.com/viRecruitSelfApply/RecDefault.aspx?FilterREID=3&FilterJobCategoryID=1 (never expires). Grid: #contentPlaceHolder_gridviewList."
+  },
+  {
+    "name": "Greenspoon Marder",
+    "careers_url": "https://www.greenspoon.com/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Scan all hrefs for 'greenspoonmarder-apply.viglobalcloud.com' — the link leads directly to the viDesktop portal. Permanent URL: greenspoonmarder-apply.viglobalcloud.com/viRecruitSelfApply/RecDefault.aspx?FilterREID=2&FilterJobCategoryID=2 (never expires). Grid: #contentPlaceHolder_gridviewList. Search by keyword via #contentPlaceHolder_textKeyWord. Capture row href before clicking."
+  },
+  {
+    "name": "Robins Kaplan",
+    "careers_url": "https://www.robinskaplan.com/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Scan all hrefs for 'robinskaplan-apply.viglobalcloud.com' — the link leads to the viDesktop portal. Tag-based URL: robinskaplan-apply.viglobalcloud.com/viRecruitSelfApply/RecDefault.aspx?Tag=... — re-discover from careers page if Tag expires. Grid: #contentPlaceHolder_gridviewList. Search by keyword via #contentPlaceHolder_textKeyWord. Capture row href before clicking."
+  },
+  {
+    "name": "Wiley",
+    "careers_url": "https://www.wiley.law/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Navigate to the Professional Staff sub-page at https://www.wiley.law/careers-professional-staff. On that page, scan hrefs for 'WileyLawExt.viglobalcloud.com' — the 'Current Openings' link leads to the portal. Permanent URL: WileyLawExt.viglobalcloud.com/viRecruitSelfApply/RecDefault.aspx?FilterREID=14 (note capital W in hostname — case-sensitive). Grid: #contentPlaceHolder_gridviewList."
+  },
+  {
+    "name": "Honigman",
+    "careers_url": "https://www.honigman.com/careers-careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page (URL is /careers-careers, not /careers). First dismiss the cookie banner by clicking 'Accept All' text button (silent — skip if not present). Then click the 'Business Professionals' tile — this navigates to /careers-business-professionals. On that page, scan hrefs for 'careers.honigman.com/viRecruitSelfApply' — specifically look for the link with 'FilterJobCategoryID=3' (Business Professionals, not Paralegals which is =2). Permanent URL: careers.honigman.com/viRecruitSelfApply/RecDefault.aspx?FilterREID=5&FilterJobCategoryID=3."
+  },
+  {
+    "name": "Thompson Hine",
+    "careers_url": "https://www.thompsonhine.com/careers/overview/",
+    "strategy": "videsktop",
+    "navigation_hints": "Careers overview page. Click 'Professional Staff Careers' link — navigates to /careers/professional-staff/. On that page, scan hrefs for 'apply.thompsonhine.com/videsktop/viRecruitSelfApply' — the 'Open Staff Positions' button leads to the portal. Note the non-standard path: /videsktop/viRecruitSelfApply/ (extra /videsktop/ prefix — use this full path as base prefix when resolving relative hrefs). Permanent URL: apply.thompsonhine.com/videsktop/viRecruitSelfApply/RecDefault.aspx?FilterREID=3 (never expires)."
+  },
+  {
+    "name": "Clark Hill",
+    "careers_url": "https://www.clarkhill.com/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Step 1: Dismiss the OneTrust cookie banner by clicking '#onetrust-accept-btn-handler' (silent — skip if absent). Step 2: Click 'Paralegals' section heading — navigates to /paralegal-opportunities. Step 3: On that page click 'Click here to view current openings' — browser navigates to the viglobalcloud portal. Step 4: Capture page.url if it matches 'clarkhillselfapply.viglobalcloud.com' (use_current_url). Step 5 fallback: Scan hrefs for 'clarkhillselfapply.viglobalcloud.com'. Tag-based URL — re-discover from careers page if expired."
+  },
+  {
+    "name": "Allen Matkins",
+    "careers_url": "https://www.allenmatkins.com/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Navigate directly to the viDesktop portal at allenmatkinsselfapply.viglobalcloud.com/viRecruitSelfApply/RecDefault.aspx. Tag-based URL — if expired, go to the careers page and scan hrefs for 'allenmatkinsselfapply.viglobalcloud.com' to re-discover. Grid: #contentPlaceHolder_gridviewList. Search by keyword via #contentPlaceHolder_textKeyWord. All row hrefs captured before clicking using three-strategy approach: RecJobView href > real http href not containing RecApplicantEmail or RecDefault > fallback listing URL. Role match mode: all_keywords (strict)."
+  },
+  {
+    "name": "Lathrop GPM",
+    "careers_url": "https://www.lathropgpm.com/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Navigate directly to the viDesktop portal at recruiting.lathropgpm.com/viDesktopEx/viRecruitSelfApply/RecDefault.aspx. IMPORTANT: This portal uses a non-standard path prefix '/viDesktopEx/viRecruitSelfApply/' — use the full path prefix when resolving relative hrefs on this portal (e.g. RecJobView.aspx resolves to recruiting.lathropgpm.com/viDesktopEx/viRecruitSelfApply/RecJobView.aspx). Tag-based URL — re-discover from careers page if expired. Grid: #contentPlaceHolder_gridviewList."
+  },
+  {
+    "name": "Womble Bond Dickinson",
+    "careers_url": "https://www.womble.com/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Navigate directly to the viDesktop portal at wbd-us-careers.viglobalcloud.com/viRecruitSelfApply/RecDefault.aspx. Tag-based URL — if expired, go to the careers page and scan hrefs for 'wbd-us-careers.viglobalcloud.com'. Grid: #contentPlaceHolder_gridviewList. Search by keyword via #contentPlaceHolder_textKeyWord. Capture row href (RecJobView preferred) before clicking. Role match mode: all_keywords. Location extraction uses strict validation: max 60 chars, no sentence punctuation, must match 'City, ST' pattern."
+  },
+  {
+    "name": "Jones Day",
+    "careers_url": "https://www.jonesday.com/en/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Navigate directly to the viDesktop portal at jonesdaystaffrecruitselfapply.viglobalcloud.com/viRecruitSelfApply/RecDefault.aspx (staff/business professionals board). Tag-based URL — re-discover from careers page by scanning hrefs for 'jonesdaystaffrecruitselfapply.viglobalcloud.com' if expired. Grid: #contentPlaceHolder_gridviewList. Search by keyword via #contentPlaceHolder_textKeyWord. Uses shared videsktop service — role match mode: any_keyword."
+  },
+  {
+    "name": "O'Melveny & Myers",
+    "careers_url": "https://www.omm.com/about/careers/",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Navigate directly to the viDesktop portal at ommcareers.viglobalcloud.com/viRecruitSelfApply/RecDefault.aspx. Tag-based URL — re-discover from careers page by scanning hrefs for 'ommcareers.viglobalcloud.com' if expired. Grid: #contentPlaceHolder_gridviewList. Search by keyword via #contentPlaceHolder_textKeyWord. Uses shared videsktop service — location extracted from section.sub-title h5/h6 in each grid row."
+  },
+  {
+    "name": "Polsinelli",
+    "careers_url": "https://www.polsinelli.com/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Navigate directly to the self-hosted viDesktop portal at virecruitex.polsinelli.com/viRecruitSelfApply/RecDefault.aspx (note: self-hosted at polsinelli.com subdomain, not viglobalcloud). Tag-based URL — re-discover from careers page by scanning hrefs for 'virecruitex.polsinelli.com' if expired. Grid: #contentPlaceHolder_gridviewList. Search by keyword via #contentPlaceHolder_textKeyWord. Uses shared videsktop service."
+  },
+  {
+    "name": "Baker Botts",
+    "careers_url": "https://www.bakerbotts.com/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Main careers page. Navigate directly to the viDesktop portal at bakerbottsselfapply.viglobalcloud.com/viRecruitSelfApply/RecDefault.aspx. Tag-based URL — re-discover from careers page by scanning hrefs for 'bakerbottsselfapply.viglobalcloud.com' if expired. Grid: #contentPlaceHolder_gridviewList. Search by keyword via #contentPlaceHolder_textKeyWord. Default location pattern covers: Austin, Boston, Century City, Chicago, Dallas, Denver, Houston, London, Los Angeles, Miami, New York, Palo Alto, San Francisco, Silicon Valley, Washington D.C."
+  }
+]
