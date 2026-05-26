@@ -7,3 +7,5 @@ python-dotenv>=1.0.0
 azure-cosmos>=4.7.0
 rich>=13.0.0
 asyncio-pool>=0.6.0
+fastapi>=0.111.0
+uvicorn>=0.29.0

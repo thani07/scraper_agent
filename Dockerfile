@@ -55,13 +55,20 @@ COPY app/                    ./app/
 COPY config/all_firms.json   ./config/all_firms.json
 COPY config/roles.json       ./config/roles.json
 COPY main.py                 .
+COPY api.py                  .
 
 # All settings come in via environment variables at runtime
-# Copy .env.example for reference — actual secrets passed via Azure env vars
 COPY .env.example .
 
 # Headless must be true inside a container (no display)
 ENV HEADLESS=true
 ENV ANONYMIZED_TELEMETRY=false
 
-CMD ["python", "main.py"]
+# MODE controls how the container starts:
+#   api  → start the HTTP API server (for testing / manual triggers)
+#   job  → run the scraper directly and exit (for scheduled Container Apps Jobs)
+ENV MODE=api
+
+EXPOSE 8000
+
+CMD ["sh", "-c", "if [ \"$MODE\" = 'job' ]; then python main.py; else uvicorn api:app --host 0.0.0.0 --port 8000; fi"]
