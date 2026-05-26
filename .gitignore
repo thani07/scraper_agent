@@ -17,6 +17,9 @@ output.txt
 videsktop_output.txt
 results.json
 
+# Azure Functions local settings — contains secrets, never commit
+local.settings.json
+
 # Python cache
 __pycache__/
 *.pyc

@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM mcr.microsoft.com/azure-functions/python:4-python3.11
 
 # Install system dependencies required by Chromium / Playwright
 RUN apt-get update && apt-get install -y \
@@ -41,34 +41,23 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Azure Functions expects code at /home/site/wwwroot
+ENV AzureWebJobsScriptRoot=/home/site/wwwroot \
+    AzureFunctionsJobHost__Logging__Console__IsEnabled=true \
+    HEADLESS=true \
+    ANONYMIZED_TELEMETRY=false
 
 # Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt /
+RUN pip install --no-cache-dir -r /requirements.txt
 
 # Install Playwright Chromium browser
 RUN playwright install chromium
 
-# Copy application code
-COPY app/                    ./app/
-COPY config/all_firms.json   ./config/all_firms.json
-COPY config/roles.json       ./config/roles.json
-COPY main.py                 .
-COPY api.py                  .
-
-# All settings come in via environment variables at runtime
-COPY .env.example .
-
-# Headless must be true inside a container (no display)
-ENV HEADLESS=true
-ENV ANONYMIZED_TELEMETRY=false
-
-# MODE controls how the container starts:
-#   api  → start the HTTP API server (for testing / manual triggers)
-#   job  → run the scraper directly and exit (for scheduled Container Apps Jobs)
-ENV MODE=api
-
-EXPOSE 8000
-
-CMD ["sh", "-c", "if [ \"$MODE\" = 'job' ]; then python main.py; else uvicorn api:app --host 0.0.0.0 --port 8000; fi"]
+# Copy application code to Azure Functions working directory
+COPY app/                    /home/site/wwwroot/app/
+COPY config/all_firms.json   /home/site/wwwroot/config/all_firms.json
+COPY config/roles.json       /home/site/wwwroot/config/roles.json
+COPY main.py                 /home/site/wwwroot/
+COPY function_app.py         /home/site/wwwroot/
+COPY host.json               /home/site/wwwroot/
