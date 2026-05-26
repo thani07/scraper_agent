@@ -100,6 +100,16 @@ class CosmosStorage:
             if not endpoint or not key:
                 raise ValueError("COSMOS_ENDPOINT and COSMOS_KEY must be set")
 
+            # COSMOS_KEY may be a full connection string
+            # (e.g. "AccountEndpoint=...;AccountKey=abc123==;")
+            # or just the bare account key (e.g. "abc123==").
+            # Extract the bare key if a connection string was provided.
+            if key.startswith("AccountEndpoint=") or "AccountKey=" in key:
+                for part in key.split(";"):
+                    if part.startswith("AccountKey="):
+                        key = part[len("AccountKey="):]
+                        break
+
             self.client = CosmosClient(endpoint, credential=key)
             db = self.client.get_database_client(
                 os.getenv("COSMOS_DATABASE", "hr-scraper")
