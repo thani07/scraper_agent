@@ -51,9 +51,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN playwright install chromium
 
 # Copy application code
-COPY app/         ./app/
-COPY config/      ./config/
-COPY main.py      .
+COPY app/                    ./app/
+COPY config/all_firms.json   ./config/all_firms.json
+COPY config/roles.json       ./config/roles.json
+COPY main.py                 .
 
 # All settings come in via environment variables at runtime
 # Copy .env.example for reference — actual secrets passed via Azure env vars

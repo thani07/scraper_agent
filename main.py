@@ -2,16 +2,12 @@
 HR Salary Scraper - Main Entry Point
 
 All configuration is driven by environment variables (.env file).
-CLI arguments are optional and override ENV values when provided.
+Roles to scrape are read from config/roles.json.
 
-ENV-only usage (recommended):
-    Set STRATEGY, ROLE, and other settings in .env, then:
-    python main.py
-
-CLI override usage:
-    python main.py --role "analyst" --strategy videsktop
-    python main.py --role "paralegal" --strategy all
-    python main.py --role "analyst" --filter "Jones Day"
+Usage:
+    python main.py                         # uses .env + config/roles.json
+    python main.py --strategy videsktop    # override strategy
+    python main.py --filter "Jones Day"    # run one firm only
 """
 
 import logging
@@ -40,21 +36,33 @@ from app.scraper import scrape_site, generate_search_terms
 from app.storage import CosmosStorage, LocalStorage
 
 
-CONFIG_DIR          = os.path.join(os.path.dirname(__file__), "config")
-VIDESKTOP_CONFIG    = os.path.join(CONFIG_DIR, "videsktop_firms.json")
-ALL_SITES_CONFIG    = os.path.join(CONFIG_DIR, "sites.json")
+CONFIG_DIR       = os.path.join(os.path.dirname(__file__), "config")
+ALL_FIRMS_CONFIG = os.path.join(CONFIG_DIR, "all_firms.json")
+ROLES_CONFIG     = os.path.join(CONFIG_DIR, "roles.json")
 
 
 # ── Config loading ─────────────────────────────────────────────────────────────
 
-def load_sites(strategy: str, site_filter: str = "all") -> list[SiteConfig]:
-    """Load site configs from JSON based on strategy selection."""
-    config_file = VIDESKTOP_CONFIG if strategy.lower() == "videsktop" else ALL_SITES_CONFIG
+def load_roles() -> list[str]:
+    """Load roles to scrape from config/roles.json."""
+    with open(ROLES_CONFIG, "r", encoding="utf-8") as f:
+        roles = json.load(f)
+    if not isinstance(roles, list) or not roles:
+        print("ERROR: config/roles.json must be a non-empty JSON array of role strings.")
+        sys.exit(1)
+    return [r.strip() for r in roles if isinstance(r, str) and r.strip()]
 
-    with open(config_file, "r", encoding="utf-8") as f:
+
+def load_sites(strategy: str, site_filter: str = "all") -> list[SiteConfig]:
+    """Load site configs from all_firms.json, optionally filtered by strategy and name."""
+    with open(ALL_FIRMS_CONFIG, "r", encoding="utf-8") as f:
         raw = json.load(f)
 
     sites = [SiteConfig(**s) for s in raw]
+
+    # Filter by strategy when not "all"
+    if strategy.lower() != "all":
+        sites = [s for s in sites if s.strategy.value == strategy.lower()]
 
     if site_filter and site_filter.lower() != "all":
         sites = [s for s in sites if site_filter.lower() in s.name.lower()]
@@ -127,7 +135,7 @@ async def run_batch(
     output_file: str,
     search_terms: list[str] | None = None,
 ) -> list[ScrapeResult]:
-    """Run all sites concurrently and write results to output_file as each completes."""
+    """Run all sites concurrently for one role, writing results live to output_file."""
     semaphore   = asyncio.Semaphore(concurrency)
     total       = len(sites)
     done_count  = [0]
@@ -173,131 +181,140 @@ async def run_batch(
 # ── Entry point ────────────────────────────────────────────────────────────────
 
 async def main():
-    # Read ENV defaults (all settings configurable without touching CLI)
-    env_strategy    = os.getenv("STRATEGY",    "all")
-    env_role        = os.getenv("ROLE",         "")
-    env_concurrency = int(os.getenv("CONCURRENCY", os.getenv("MAX_CONCURRENT", "3")))
+    env_strategy    = os.getenv("STRATEGY",    "videsktop")
+    env_concurrency = int(os.getenv("CONCURRENCY", os.getenv("MAX_CONCURRENT", "5")))
     env_output      = os.getenv("OUTPUT_FILE",  "output.txt")
     env_storage     = os.getenv("STORAGE",      "local")
     env_site_filter = os.getenv("SITE_FILTER",  "all")
 
-    # CLI args override ENV when explicitly passed
     parser = argparse.ArgumentParser(
         description="HR Salary Scraper",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="All options can be set via .env — CLI args override them when provided.",
+        epilog="Roles are read from config/roles.json. All other options via .env or CLI.",
     )
-    parser.add_argument(
-        "--role", type=str, default=env_role,
-        help=f"Role to search. ENV: ROLE (current: '{env_role}')",
-    )
-    parser.add_argument(
-        "--strategy", type=str, default=env_strategy,
-        choices=["videsktop", "all"],
-        help=f"Which strategy/config to run. ENV: STRATEGY (current: '{env_strategy}')",
-    )
-    parser.add_argument(
-        "--concurrency", type=int, default=env_concurrency,
-        help=f"Concurrent browser sessions. ENV: CONCURRENCY (current: {env_concurrency})",
-    )
-    parser.add_argument(
-        "--output", type=str, default=env_output,
-        help=f"Output file path. ENV: OUTPUT_FILE (current: '{env_output}')",
-    )
-    parser.add_argument(
-        "--storage", type=str, default=env_storage,
-        choices=["local", "cosmos"],
-        help=f"Storage backend. ENV: STORAGE (current: '{env_storage}')",
-    )
-    parser.add_argument(
-        "--filter", type=str, default=env_site_filter,
-        help="Narrow to a single firm by name substring. ENV: SITE_FILTER",
-    )
+    parser.add_argument("--strategy",    type=str, default=env_strategy,
+                        choices=["videsktop", "all", "workday", "icims", "ultipro", "florecruit", "direct"],
+                        help=f"Which firms to run. ENV: STRATEGY (current: '{env_strategy}')")
+    parser.add_argument("--concurrency", type=int, default=env_concurrency,
+                        help=f"Concurrent browser sessions. ENV: CONCURRENCY (current: {env_concurrency})")
+    parser.add_argument("--output",      type=str, default=env_output,
+                        help=f"Output file path. ENV: OUTPUT_FILE (current: '{env_output}')")
+    parser.add_argument("--storage",     type=str, default=env_storage,
+                        choices=["local", "cosmos"],
+                        help=f"Storage backend. ENV: STORAGE (current: '{env_storage}')")
+    parser.add_argument("--filter",      type=str, default=env_site_filter,
+                        help="Narrow to one firm by name substring. ENV: SITE_FILTER")
 
     args = parser.parse_args()
 
-    if not args.role:
-        print("ERROR: Role is required.")
-        print("  Set ROLE=<role> in .env  OR  pass --role \"<role>\" on the command line.")
-        print("  Example: python main.py --role \"analyst\"")
-        sys.exit(1)
-
-    # Apply browser/logging overrides so batch runs stay clean
     os.environ["ANONYMIZED_TELEMETRY"] = "false"
     os.environ["VERBOSE_ACTIONS"]      = os.getenv("VERBOSE_ACTIONS",   "false")
     os.environ["SAVE_GIF"]             = os.getenv("SAVE_GIF",          "false")
     os.environ["SAVE_CONVERSATION"]    = os.getenv("SAVE_CONVERSATION", "false")
     os.environ["HEADLESS"]             = os.getenv("HEADLESS",          "true")
 
+    # Load roles and sites once
+    roles = load_roles()
     sites = load_sites(args.strategy, args.filter)
     if not sites:
         print(f"ERROR: No sites found  (strategy='{args.strategy}'  filter='{args.filter}')")
         sys.exit(1)
 
-    # Generate law-firm-specific search terms via LLM before batch starts.
-    # One LLM call here produces 4-5 alternatives; every firm then searches all of them.
-    print(f"\n  Generating search terms for \"{args.role}\" ...")
-    search_terms = await generate_search_terms(args.role)
-    print(f"  Search terms ({len(search_terms)}):")
-    for i, t in enumerate(search_terms):
-        prefix = "  [user]" if i == 0 else "  [ AI ]"
-        print(f"    {prefix}  {t}")
-
     started_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    header = (
+    run_header = (
         f"\n{'='*70}\n"
         f"  HR SALARY SCRAPER\n"
-        f"  Role        : {args.role}\n"
-        f"  Search terms: {', '.join(search_terms)}\n"
+        f"  Roles       : {', '.join(roles)}\n"
         f"  Strategy    : {args.strategy}\n"
         f"  Firms       : {len(sites)}\n"
         f"  Concurrency : {args.concurrency}\n"
-        f"  Output      : {args.output}\n"
         f"  Storage     : {args.storage}\n"
+        f"  Output      : {args.output}\n"
         f"  Started     : {started_at}\n"
         f"{'='*70}\n"
     )
-    print(header)
+    print(run_header)
 
-    # Write output file header
     with open(args.output, "w", encoding="utf-8") as f:
-        f.write(header)
+        f.write(run_header)
 
-    all_results = await run_batch(
-        sites, args.role, args.concurrency, args.output, search_terms=search_terms
-    )
+    # Storage backend — shared across all roles so all results share one run_id
+    storage = CosmosStorage() if args.storage == "cosmos" else LocalStorage()
+    await storage.connect()
 
-    # Write footer
-    finished_at   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    total_firms   = len({r.firm_name for r in all_results})
-    success_firms = len({r.firm_name for r in all_results if r.status == "success"})
-    total_jobs    = sum(1 for r in all_results if r.status == "success")
-    error_firms   = len({r.firm_name for r in all_results if r.status == "error"})
-    nores_firms   = max(0, total_firms - success_firms - error_firms)
+    total_jobs_all_roles  = 0
+    total_firms_all_roles = 0
 
+    # ── One full batch per role ────────────────────────────────────────────────
+    for role in roles:
+        print(f"\n  Generating search terms for \"{role}\" ...")
+        search_terms = await generate_search_terms(role)
+        print(f"  Search terms ({len(search_terms)}):")
+        for i, t in enumerate(search_terms):
+            prefix = "  [user]" if i == 0 else "  [ AI ]"
+            print(f"    {prefix}  {t}")
+
+        role_header = (
+            f"\n{'-'*70}\n"
+            f"  ROLE: {role.upper()}\n"
+            f"  Search terms: {', '.join(search_terms)}\n"
+            f"  Firms: {len(sites)}\n"
+            f"{'-'*70}\n"
+        )
+        print(role_header)
+        with open(args.output, "a", encoding="utf-8") as f:
+            f.write(role_header)
+
+        all_results = await run_batch(
+            sites, role, args.concurrency, args.output, search_terms=search_terms
+        )
+
+        # Save this role's results to storage
+        await storage.save_batch(all_results)
+
+        # Role summary
+        total_firms   = len({r.firm_name for r in all_results})
+        success_firms = len({r.firm_name for r in all_results if r.status == "success"})
+        total_jobs    = sum(1 for r in all_results if r.status == "success")
+        error_firms   = len({r.firm_name for r in all_results if r.status == "error"})
+        nores_firms   = max(0, total_firms - success_firms - error_firms)
+
+        role_summary = (
+            f"\n  [{role.upper()}] "
+            f"{success_firms}/{total_firms} firms  |  "
+            f"{total_jobs} jobs  |  "
+            f"{nores_firms} no results  |  "
+            f"{error_firms} errors\n"
+        )
+        print(role_summary)
+        with open(args.output, "a", encoding="utf-8") as f:
+            f.write(role_summary)
+
+        total_jobs_all_roles  += total_jobs
+        total_firms_all_roles  = len(sites)
+
+    # ── Final footer ───────────────────────────────────────────────────────────
+    finished_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     footer = (
-        f"\n{'-'*70}\n"
+        f"\n{'='*70}\n"
+        f"  Run complete\n"
+        f"  Roles       : {len(roles)} ({', '.join(roles)})\n"
+        f"  Firms       : {total_firms_all_roles}\n"
+        f"  Total jobs  : {total_jobs_all_roles}\n"
         f"  Finished    : {finished_at}\n"
-        f"  Results     : {success_firms}/{total_firms} firms  |  "
-        f"{total_jobs} total jobs  |  {nores_firms} no results  |  {error_firms} errors\n"
-        f"{'-'*70}\n"
+        f"{'='*70}\n"
     )
     with open(args.output, "a", encoding="utf-8") as f:
         f.write(footer)
 
-    print(f"\n{'-'*70}")
-    print(f"  Done  {success_firms}/{total_firms} firms  |  {total_jobs} jobs  |  finished {finished_at}")
-    print(f"  Full results -> {args.output}")
-
-    # Save to storage backend
-    storage = CosmosStorage() if args.storage == "cosmos" else LocalStorage()
-    await storage.connect()
-    await storage.save_batch(all_results)
-    await storage.close()
     save_loc = "results.json" if args.storage == "local" else "Azure Cosmos DB"
-    print(f"  Saved to    -> {save_loc}")
+    print(f"\n{'-'*70}")
+    print(f"  Done  |  {len(roles)} roles  |  {total_jobs_all_roles} total jobs  |  finished {finished_at}")
+    print(f"  Results -> {args.output}  |  Storage -> {save_loc}")
     print(f"{'-'*70}\n")
+
+    await storage.close()
 
 
 if __name__ == "__main__":
