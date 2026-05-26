@@ -291,7 +291,13 @@ async def run_scraper(
     with open(output_file, "a", encoding="utf-8") as f:
         f.write(footer)
 
-    save_loc = "Azure Cosmos DB" if storage_type == "cosmos" else "results.json"
+    # Report actual storage used (CosmosStorage falls back to local if connection fails)
+    cosmos_connected = (
+        storage_type == "cosmos"
+        and hasattr(storage, "container")
+        and storage.container is not None
+    )
+    save_loc = "Azure Cosmos DB" if cosmos_connected else "results.json (Cosmos unavailable — saved locally)"
     print(f"\n{'-'*70}")
     print(f"  Done  |  {len(roles)} roles  |  {total_jobs_all} total jobs  |  finished {finished_at}")
     print(f"  Results -> {output_file}  |  Storage -> {save_loc}")
