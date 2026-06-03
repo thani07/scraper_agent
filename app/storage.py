@@ -98,42 +98,64 @@ class CosmosStorage:
         self.container = None
         self.run_id    = str(uuid.uuid4())   # shared across all saves in one run
 
+    @property
+    def cosmos_connected(self) -> bool:
+        """True only when Cosmos DB is reachable and the container is ready."""
+        return self.container is not None
+
     async def connect(self):
-        try:
-            from azure.cosmos.aio import CosmosClient
-            from azure.cosmos import PartitionKey
-            endpoint = os.getenv("COSMOS_ENDPOINT")
-            key      = os.getenv("COSMOS_KEY")
+        """
+        Connect to Cosmos DB and verify the connection with a lightweight read.
 
-            if not endpoint or not key:
-                raise ValueError("COSMOS_ENDPOINT and COSMOS_KEY must be set")
+        Raises RuntimeError if connection or verification fails — this is intentional.
+        Silent fallback to local disk caused data loss in Azure (ephemeral filesystem).
+        The caller (run_scraper) must handle this and abort if STORAGE=cosmos was requested.
+        """
+        from azure.cosmos.aio import CosmosClient
+        from azure.cosmos import PartitionKey
 
-            # COSMOS_KEY may be a full connection string
-            # (e.g. "AccountEndpoint=...;AccountKey=abc123==;")
-            # or just the bare account key (e.g. "abc123==").
-            if key.startswith("AccountEndpoint=") or "AccountKey=" in key:
-                for part in key.split(";"):
-                    if part.startswith("AccountKey="):
-                        key = part[len("AccountKey="):]
-                        break
+        endpoint = os.getenv("COSMOS_ENDPOINT")
+        key      = os.getenv("COSMOS_KEY")
 
-            db_name        = os.getenv("COSMOS_DATABASE",  "hr-scraper")
-            container_name = os.getenv("COSMOS_CONTAINER", "job-results")
-
-            self.client = CosmosClient(endpoint, credential=key)
-
-            # Auto-create database and container if they don't exist yet.
-            # Partition key /role_title stores the actual job title from the website.
-            db = await self.client.create_database_if_not_exists(id=db_name)
-            self.container = await db.create_container_if_not_exists(
-                id=container_name,
-                partition_key=PartitionKey(path="/role_title"),
+        if not endpoint or not key:
+            raise RuntimeError(
+                "COSMOS_ENDPOINT and COSMOS_KEY must both be set in environment / App Settings."
             )
-            print(f"  Cosmos DB connected: {db_name} / {container_name}")
-        except Exception as e:
-            print(f"  [WARN] Cosmos DB connection failed: {e}")
-            print("  [WARN] Falling back to local JSON storage")
+
+        # COSMOS_KEY may be a full connection string
+        # (e.g. "AccountEndpoint=...;AccountKey=abc123==;")
+        # or just the bare account key (e.g. "abc123==").
+        if key.startswith("AccountEndpoint=") or "AccountKey=" in key:
+            for part in key.split(";"):
+                if part.startswith("AccountKey="):
+                    key = part[len("AccountKey="):]
+                    break
+
+        db_name        = os.getenv("COSMOS_DATABASE",  "hr-scraper")
+        container_name = os.getenv("COSMOS_CONTAINER", "job-results")
+
+        self.client = CosmosClient(endpoint, credential=key)
+
+        # Auto-create database and container if they don't exist yet.
+        # Partition key /role_title stores the actual job title from the website.
+        db = await self.client.create_database_if_not_exists(id=db_name)
+        self.container = await db.create_container_if_not_exists(
+            id=container_name,
+            partition_key=PartitionKey(path="/role_title"),
+        )
+
+        # Verify connection with a lightweight read (query metadata).
+        # This catches auth errors that only surface on the first real request.
+        try:
+            props = await self.container.read()
+            _ = props  # just confirming it returns without error
+        except Exception as verify_err:
             self.container = None
+            raise RuntimeError(
+                f"Cosmos DB container read verification failed: {verify_err}"
+            ) from verify_err
+
+        print(f"  Cosmos DB connected and verified: {db_name} / {container_name}")
 
     async def save(self, result: ScrapeResult):
         doc = _build_document(result, self.run_id)

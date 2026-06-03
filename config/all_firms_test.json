@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Jones Day",
+    "careers_url": "https://www.jonesday.com/en/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Loads the viDesktop portal at jonesdaystaffrecruitselfapply.viglobalcloud.com/viRecruitSelfApply/RecDefault.aspx with a Tag-based URL. If expired, navigates to jonesday.com/en/careers and scans hrefs for jonesdaystaffrecruitselfapply.viglobalcloud.com. Grid: #contentPlaceHolder_gridviewList. Role match mode: any_keyword."
+  },
+  {
+    "name": "Greenspoon Marder",
+    "careers_url": "https://www.greenspoon.com/careers",
+    "strategy": "videsktop",
+    "navigation_hints": "Navigates to greenspoon.com/careers and scans hrefs for greenspoonmarder-apply.viglobalcloud.com. Permanent URL: FilterREID=2&FilterJobCategoryID=2 (never expires). Grid: #contentPlaceHolder_gridviewList. Searches via #contentPlaceHolder_textKeyWord."
+  },
+  {
+    "name": "Womble Bond Dickinson",
+    "careers_url": "https://wbd-us-careers.viglobalcloud.com/viRecruitSelfApply/RecDefault.aspx",
+    "strategy": "videsktop",
+    "navigation_hints": "Navigates directly to the viDesktop portal at wbd-us-careers.viglobalcloud.com/viRecruitSelfApply/RecDefault.aspx. Tag-based URL — if expired, discovers from careers page scanning hrefs for wbd-us-careers.viglobalcloud.com. Grid: #contentPlaceHolder_gridviewList. Searches via #contentPlaceHolder_textKeyWord. Role match mode: all_keywords."
+  },
+  {
+    "name": "Davis Polk",
+    "careers_url": "https://www.davispolk.com/careers/overview",
+    "strategy": "workday",
+    "navigation_hints": "Navigates the Davis Polk careers overview page, then goes directly to the Workday portal at davispolk.wd5.myworkdayjobs.com/business-professionals-services-usa. Searches by keyword in the Workday search box, clicks each matching job card to update the right panel, extracts title from jobPostingTitle automation-id, location from the locations/additionalLocations containers, and salary from compensation/salaryRange attributes or dollar regex."
+  },
+  {
+    "name": "Cooley LLP",
+    "careers_url": "https://www.cooley.com/careers",
+    "strategy": "workday",
+    "navigation_hints": "Loads the Workday portal directly at cooley.wd1.myworkdayjobs.com/Cooley_US_LLP. Searches by keyword in the standard Workday search box, collects all job card titles, filters by role keywords, then clicks each card to update the right detail panel. Reads location from locations/additionalLocations in the jobDetails panel. Salary from compensation/salaryRange automation-id or dollar regex."
+  },
+  {
+    "name": "Willkie Farr & Gallagher",
+    "careers_url": "https://www.willkie.com/careers/professional-staff",
+    "strategy": "icims",
+    "navigation_hints": "Starts on Willkie's Professional Staff careers page, navigates to iCIMS portal at jobs-willkie.icims.com with keyword in URL. All content inside #icims_content_iframe. Collects job links from iframe, visits each detail page for title, location, salary."
+  },
+  {
+    "name": "Foley & Lardner",
+    "careers_url": "https://www.foley.com/careers/",
+    "strategy": "icims",
+    "navigation_hints": "Starts on Foley's careers page, navigates to the iCIMS portal at careers-foley.icims.com with a keyword in the searchKeyword param. All content lives inside an iframe named 'icims_content_iframe'. Collects job links from the iframe DOM, visits each detail page to extract title, location, and salary. Keyword search is done via URL param."
+  },
+  {
+    "name": "Loeb & Loeb",
+    "careers_url": "https://careers.loeb.com/go/Professional-Staff/9822200/",
+    "strategy": "florecruit",
+    "navigation_hints": "Navigates to Loeb's careers page and follows the link to FLO Recruit portal at florecruit.com/v2/app/loeb/jobs. React SPA; scrolls through all job cards. All jobs on this board are staff roles. Collects title, location, salary from card content."
+  },
+  {
+    "name": "Holland & Hart",
+    "careers_url": "https://www.hollandhart.com/careers",
+    "strategy": "florecruit",
+    "navigation_hints": "Navigates to Holland & Hart's careers page and follows the staff jobs link to FLO Recruit at florecruit.com/v2/app/hollandhart/jobs. React SPA; scrolls through all job cards."
+  },
+  {
+    "name": "Akin Gump Strauss Hauer & Feld",
+    "careers_url": "https://www.akingump.com/en/careers/business-services",
+    "strategy": "direct",
+    "navigation_hints": "Starts on the Business Services careers page, navigates to the SilkRoad ATS at jobs.silkroad.com/AkinGump/AkinGump. Static HTML, all jobs on one page. Keyword filtering done client-side. Detail page: title and location from HTML title tag; salary from description prose."
+  }
+]

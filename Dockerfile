@@ -56,8 +56,7 @@ RUN playwright install chromium
 
 # Copy application code to Azure Functions working directory
 COPY app/                    /home/site/wwwroot/app/
-COPY config/all_firms.json   /home/site/wwwroot/config/all_firms.json
-COPY config/roles.json       /home/site/wwwroot/config/roles.json
+COPY config/                 /home/site/wwwroot/config/
 COPY main.py                 /home/site/wwwroot/
 COPY function_app.py         /home/site/wwwroot/
 COPY host.json               /home/site/wwwroot/

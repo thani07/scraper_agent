@@ -64,9 +64,10 @@ async def scheduled_scrape(timer: func.TimerRequest) -> None:
         logging.info("Timer is past due — running now.")
     logging.info("Scheduled scrape started.")
     await _execute_scrape(
-        strategy    = os.getenv("STRATEGY",    "videsktop"),
-        site_filter = os.getenv("SITE_FILTER", "all"),
-        roles       = None,
+        strategy     = os.getenv("STRATEGY",    "all"),
+        site_filter  = os.getenv("SITE_FILTER", "all"),
+        roles        = None,
+        firms_config = os.getenv("FIRMS_CONFIG") or None,
     )
     logging.info("Scheduled scrape completed.")
 
@@ -101,9 +102,10 @@ async def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
     except Exception:
         pass
 
-    strategy    = body.get("strategy") or os.getenv("STRATEGY",    "videsktop")
-    site_filter = body.get("filter")   or os.getenv("SITE_FILTER", "all")
-    roles       = body.get("roles")    or None
+    strategy     = body.get("strategy") or os.getenv("STRATEGY",    "all")
+    site_filter  = body.get("filter")   or os.getenv("SITE_FILTER", "all")
+    roles        = body.get("roles")    or None
+    firms_config = body.get("firms_config") or os.getenv("FIRMS_CONFIG") or None
 
     # Reset state
     _run_state.update({
@@ -127,10 +129,10 @@ async def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
     })
 
     _background_task = asyncio.create_task(
-        _execute_scrape(strategy, site_filter, roles)
+        _execute_scrape(strategy, site_filter, roles, firms_config)
     )
 
-    logging.info(f"Scrape started: strategy={strategy} filter={site_filter} roles={roles}")
+    logging.info(f"Scrape started: strategy={strategy} filter={site_filter} roles={roles} firms_config={firms_config}")
 
     return func.HttpResponse(
         json.dumps({
@@ -157,7 +159,7 @@ async def status_trigger(req: func.HttpRequest) -> func.HttpResponse:
 
 # ── Core scrape runner ─────────────────────────────────────────────────────────
 
-async def _execute_scrape(strategy: str, site_filter: str, roles):
+async def _execute_scrape(strategy: str, site_filter: str, roles, firms_config: str | None = None):
     """Run the scraper and update _run_state on completion."""
     global _run_state
 
@@ -183,10 +185,11 @@ async def _execute_scrape(strategy: str, site_filter: str, roles):
     try:
         from main import run_scraper
         summary = await run_scraper(
-            strategy    = strategy,
-            site_filter = site_filter,
-            roles       = roles,
-            on_progress = on_progress,
+            strategy     = strategy,
+            site_filter  = site_filter,
+            roles        = roles,
+            on_progress  = on_progress,
+            firms_config = firms_config,
         )
         _run_state.update({
             "status":      "completed",
