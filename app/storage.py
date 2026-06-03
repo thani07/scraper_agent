@@ -16,20 +16,22 @@ def _build_document(result: ScrapeResult, run_id: str) -> dict:
     """
     Flatten a ScrapeResult into a single Cosmos DB document.
 
-    Partition key: /role  — all jobs for the same role land in the same partition.
-    run_id groups every document produced in one scheduled execution together.
+    Partition key: /role_title — the actual job title fetched from the website
+                                 (e.g. "Litigation Associate", "Paralegal, Real Estate").
+                                 For no_results/error records (no extraction), falls back
+                                 to the searched_role so the field is never null.
 
     Document shape:
-        id            — unique UUID per document
-        role          — partition key  (e.g. "paralegal")
-        run_id        — UUID shared by all documents in one run
-        scraped_at    — ISO-8601 UTC timestamp
+        id              — unique UUID per document
+        role_title      — partition key — actual job title from the website
+        searched_role   — the role keyword used to find this job (e.g. "paralegal")
+        run_id          — UUID shared by all documents in one run
+        scraped_at      — ISO-8601 UTC timestamp
         firm_name
         strategy_used
-        status        — success | no_results | error
-        error_message — only present on error
+        status          — success | no_results | error
+        error_message   — only present on error
         scrape_duration_sec
-        role_title
         description
         salary_min
         salary_max
@@ -43,9 +45,15 @@ def _build_document(result: ScrapeResult, run_id: str) -> dict:
     """
     e = result.extraction
 
+    # role_title is the partition key — Cosmos DB requires it to be non-null.
+    # For success records: use the actual extracted job title from the website.
+    # For no_results / error: no extraction exists, so fall back to the searched role.
+    role_title = (e.role_title if e and e.role_title else result.role_searched)
+
     doc: dict = {
         "id":                   str(uuid.uuid4()),
-        "role":                 result.role_searched,        # partition key
+        "role_title":           role_title,               # partition key — actual job title
+        "searched_role":        result.role_searched,     # keyword used to search (e.g. "paralegal")
         "run_id":               run_id,
         "scraped_at":           datetime.now(timezone.utc).isoformat(),
         "firm_name":            result.firm_name,
@@ -58,7 +66,6 @@ def _build_document(result: ScrapeResult, run_id: str) -> dict:
         doc["error_message"] = result.error_message
 
     if e:
-        doc["role_title"]        = e.role_title
         doc["description"]       = e.description
         doc["salary_min"]        = e.salary_min
         doc["salary_max"]        = e.salary_max
@@ -78,12 +85,12 @@ class CosmosStorage:
     Save results to Azure Cosmos DB.
 
     Container setup:
-        Database  : set via COSMOS_DATABASE  (e.g. "hr-scraper")
-        Container : set via COSMOS_CONTAINER  (e.g. "job-results")
-        Partition key path: /role
+        Database  : set via COSMOS_DATABASE  (e.g. "salary-intelligence-uat")
+        Container : set via COSMOS_CONTAINER  (e.g. "agent_job_results_v2")
+        Partition key path: /role_title
 
-    Same role → same partition (fast cross-firm queries per role).
-    Different roles → different partitions.
+    Each unique job title lands in its own logical partition.
+    Use searched_role field to query all jobs found for a given search keyword.
     """
 
     def __init__(self):
@@ -94,6 +101,7 @@ class CosmosStorage:
     async def connect(self):
         try:
             from azure.cosmos.aio import CosmosClient
+            from azure.cosmos import PartitionKey
             endpoint = os.getenv("COSMOS_ENDPOINT")
             key      = os.getenv("COSMOS_KEY")
 
@@ -103,20 +111,25 @@ class CosmosStorage:
             # COSMOS_KEY may be a full connection string
             # (e.g. "AccountEndpoint=...;AccountKey=abc123==;")
             # or just the bare account key (e.g. "abc123==").
-            # Extract the bare key if a connection string was provided.
             if key.startswith("AccountEndpoint=") or "AccountKey=" in key:
                 for part in key.split(";"):
                     if part.startswith("AccountKey="):
                         key = part[len("AccountKey="):]
                         break
 
+            db_name        = os.getenv("COSMOS_DATABASE",  "hr-scraper")
+            container_name = os.getenv("COSMOS_CONTAINER", "job-results")
+
             self.client = CosmosClient(endpoint, credential=key)
-            db = self.client.get_database_client(
-                os.getenv("COSMOS_DATABASE", "hr-scraper")
+
+            # Auto-create database and container if they don't exist yet.
+            # Partition key /role_title stores the actual job title from the website.
+            db = await self.client.create_database_if_not_exists(id=db_name)
+            self.container = await db.create_container_if_not_exists(
+                id=container_name,
+                partition_key=PartitionKey(path="/role_title"),
             )
-            self.container = db.get_container_client(
-                os.getenv("COSMOS_CONTAINER", "job-results")
-            )
+            print(f"  Cosmos DB connected: {db_name} / {container_name}")
         except Exception as e:
             print(f"  [WARN] Cosmos DB connection failed: {e}")
             print("  [WARN] Falling back to local JSON storage")

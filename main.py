@@ -4,10 +4,17 @@ HR Salary Scraper - Core logic + CLI entry point.
 run_scraper()  — importable async function called by Azure Functions triggers
 main()         — CLI entry point (reads argparse + .env)
 
+Processing order: FIRM-FIRST.
+  For each firm (up to `concurrency` at once), all roles are searched sequentially.
+  This ensures every firm is fully processed before moving on, avoids role starvation,
+  and limits open browsers to `concurrency` at most (one per firm slot).
+
 CLI usage:
-    python main.py                         # uses .env + config/roles.json
-    python main.py --strategy videsktop    # override strategy
-    python main.py --filter "Jones Day"    # run one firm only
+    python main.py                                           # all firms, all roles
+    python main.py --strategy videsktop                     # only videsktop firms
+    python main.py --filter "Jones Day"                     # one firm only
+    python main.py --firms-config config/all_firms_test.json  # use test config (5 firms)
+    python main.py --storage local                          # save to results.json only
 """
 
 import logging
@@ -52,9 +59,17 @@ def load_roles() -> list[str]:
     return [r.strip() for r in roles if isinstance(r, str) and r.strip()]
 
 
-def load_sites(strategy: str, site_filter: str = "all") -> list[SiteConfig]:
-    """Load site configs from all_firms.json, optionally filtered by strategy and name."""
-    with open(ALL_FIRMS_CONFIG, "r", encoding="utf-8") as f:
+def load_sites(
+    strategy: str,
+    site_filter: str = "all",
+    firms_config: str | None = None,
+) -> list[SiteConfig]:
+    """Load site configs, optionally filtered by strategy and firm name.
+
+    firms_config: path to a JSON config file; defaults to config/all_firms.json.
+    """
+    config_path = firms_config or ALL_FIRMS_CONFIG
+    with open(config_path, "r", encoding="utf-8") as f:
         raw = json.load(f)
 
     sites = [SiteConfig(**s) for s in raw]
@@ -123,53 +138,141 @@ def _firm_lines(firm_name: str, firm_results: list[ScrapeResult], role: str) -> 
     return lines
 
 
-# ── Batch runner ───────────────────────────────────────────────────────────────
+# ── Firm-first batch runner ────────────────────────────────────────────────────
 
-async def run_batch(
+async def run_batch_firm_first(
     sites: list[SiteConfig],
-    role: str,
+    roles: list[str],
     concurrency: int,
     output_file: str,
-    search_terms: list[str] | None = None,
+    role_search_terms: dict[str, list[str]],
+    on_progress=None,
+    storage=None,
+    save_every: int = 5,
 ) -> list[ScrapeResult]:
-    semaphore   = asyncio.Semaphore(concurrency)
-    total       = len(sites)
-    done_count  = [0]
+    """
+    Process firms concurrently. For each firm, ALL roles are searched sequentially.
+
+    Execution pattern (concurrency=3 example):
+        Slot 1: [Firm A] paralegal → litigation → business development
+        Slot 2: [Firm B] paralegal → litigation → business development
+        Slot 3: [Firm C] paralegal → litigation → business development
+        (Firm D starts once any slot frees up)
+
+    Benefits vs role-first:
+      - Every firm is guaranteed to get all roles — no role starvation on timeout
+      - At most `concurrency` browsers open simultaneously (not concurrency × roles)
+      - Output file shows all roles per firm grouped together
+    """
+    semaphore       = asyncio.Semaphore(concurrency)
+    total           = len(sites)
+    done_count      = [0]
+    total_jobs_live = [0]
     all_results: list[ScrapeResult] = []
+    pending_save: list[ScrapeResult] = []
     file_lock   = asyncio.Lock()
+    save_lock   = asyncio.Lock()
 
-    async def run_one(site: SiteConfig) -> list[ScrapeResult]:
+    if on_progress:
+        on_progress(firms_total=total)
+
+    async def flush_pending():
+        """Save buffered results to storage and clear the buffer."""
+        async with save_lock:
+            if pending_save and storage:
+                batch = list(pending_save)
+                pending_save.clear()
+                try:
+                    await storage.save_batch(batch)
+                    jobs = sum(1 for r in batch if r.status == "success")
+                    print(f"  [DB] Saved {len(batch)} results ({jobs} jobs) to storage.")
+                except Exception as e:
+                    print(f"  [DB][WARN] Save failed: {e}")
+
+    async def process_firm(site: SiteConfig) -> list[ScrapeResult]:
         async with semaphore:
-            results  = await scrape_site(site, role, search_terms=search_terms)
-            done_count[0] += 1
-            jobs     = sum(1 for r in results if r.status == "success")
-            dur      = results[0].scrape_duration_sec if results else 0
-            has_ok   = any(r.status == "success"  for r in results)
-            has_err  = any(r.status == "error"    for r in results)
-            tag      = "OK " if has_ok else ("ERR" if has_err else "---")
-            print(f"  [{tag}] [{done_count[0]:>2}/{total}] {site.name}  --  {jobs} job(s)  ({dur}s)")
+            if on_progress:
+                on_progress(current_firm=site.name)
 
-            lines = _firm_lines(site.name, results, role)
+            firm_results: list[ScrapeResult] = []
+
+            # ── Search each role sequentially within this firm ──
+            for role in roles:
+                if on_progress:
+                    on_progress(current_role=role)
+                role_results = await scrape_site(
+                    site, role, role_search_terms.get(role, [])
+                )
+                firm_results.extend(role_results)
+
+            # ── Console one-liner ──
+            done_count[0] += 1
+            new_jobs         = sum(1 for r in firm_results if r.status == "success")
+            total_jobs_live[0] += new_jobs
+            dur_vals         = [r.scrape_duration_sec for r in firm_results if r.scrape_duration_sec]
+            dur              = round(sum(dur_vals), 1) if dur_vals else 0
+            has_ok           = any(r.status == "success" for r in firm_results)
+            has_err          = any(r.status == "error"   for r in firm_results)
+            tag              = "OK " if has_ok else ("ERR" if has_err else "---")
+
+            # Per-role job counts for the console line
+            role_counts = "  ".join(
+                f"{role}:{sum(1 for r in firm_results if r.role_searched == role and r.status == 'success')}"
+                for role in roles
+            )
+            print(
+                f"  [{tag}] [{done_count[0]:>2}/{total}] {site.name}  --  "
+                f"{new_jobs} job(s)  ({dur}s)  [{role_counts}]"
+            )
+
+            if on_progress:
+                on_progress(
+                    firms_done=done_count[0],
+                    firms_total=total,
+                    jobs_found_so_far=total_jobs_live[0],
+                )
+
+            # ── Write firm section to output file (all roles grouped) ──
+            lines: list[str] = [
+                f"\n{'─'*70}",
+                f"  FIRM: {site.name}  ({site.strategy.value})",
+                f"{'─'*70}",
+            ]
+            for role in roles:
+                role_results = [r for r in firm_results if r.role_searched == role]
+                lines.append(f"\n  ── Role: {role.upper()} ──")
+                lines.extend(_firm_lines(site.name, role_results, role))
+
             async with file_lock:
                 with open(output_file, "a", encoding="utf-8") as f:
                     f.write("\n".join(lines) + "\n")
+                pending_save.extend(firm_results)
 
-            return results
+            if done_count[0] % save_every == 0:
+                await flush_pending()
 
-    tasks        = [asyncio.create_task(run_one(site)) for site in sites]
+            return firm_results
+
+    tasks        = [asyncio.create_task(process_firm(site)) for site in sites]
     results_list = await asyncio.gather(*tasks, return_exceptions=True)
 
     for i, r in enumerate(results_list):
         if isinstance(r, Exception):
-            all_results.append(ScrapeResult(
-                firm_name=sites[i].name,
-                strategy_used="unknown",
-                role_searched=role,
-                status="error",
-                error_message=str(r)[:500],
-            ))
+            # Firm-level exception: create error results for every role
+            for role in roles:
+                all_results.append(ScrapeResult(
+                    firm_name=sites[i].name,
+                    strategy_used="unknown",
+                    role_searched=role,
+                    status="error",
+                    error_message=str(r)[:500],
+                ))
         else:
             all_results.extend(r)
+
+    # Final flush for any remaining unsaved results
+    if pending_save:
+        await flush_pending()
 
     return all_results
 
@@ -177,17 +280,28 @@ async def run_batch(
 # ── Core async function — called by both CLI and Azure Functions ───────────────
 
 async def run_scraper(
-    strategy:    str | None = None,
-    site_filter: str | None = None,
-    concurrency: int | None = None,
-    output_file: str | None = None,
+    strategy:     str | None = None,
+    site_filter:  str | None = None,
+    concurrency:  int | None = None,
+    output_file:  str | None = None,
     storage_type: str | None = None,
-    roles:       list[str] | None = None,
+    roles:        list[str] | None = None,
+    on_progress   = None,
+    firms_config: str | None = None,
 ) -> dict:
     """
     Run the full scrape job.
 
-    All parameters fall back to environment variables when not provided.
+    Processing order: FIRM-FIRST.
+      Pre-generates search terms for all roles, then processes all firms concurrently
+      (up to `concurrency`). Each firm searches all roles sequentially before releasing
+      its concurrency slot.
+
+    Parameters:
+        firms_config: Path to firms JSON file. Defaults to config/all_firms.json.
+                      Override via env var FIRMS_CONFIG or CLI --firms-config.
+                      Use config/all_firms_test.json for local 5-firm testing.
+
     Returns a summary dict with counts per role.
     """
     os.environ["ANONYMIZED_TELEMETRY"] = "false"
@@ -202,12 +316,14 @@ async def run_scraper(
     output_file  = output_file  or os.getenv("OUTPUT_FILE",  "output.txt")
     storage_type = storage_type or os.getenv("STORAGE",      "local")
     roles        = roles        or load_roles()
+    firms_config = firms_config or os.getenv("FIRMS_CONFIG") or None
 
-    sites = load_sites(strategy, site_filter)
+    sites = load_sites(strategy, site_filter, firms_config)
     if not sites:
         raise ValueError(f"No sites found for strategy='{strategy}' filter='{site_filter}'")
 
-    started_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    started_at   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    config_label = os.path.basename(firms_config) if firms_config else "all_firms.json"
 
     run_header = (
         f"\n{'='*70}\n"
@@ -218,6 +334,7 @@ async def run_scraper(
         f"  Concurrency : {concurrency}\n"
         f"  Storage     : {storage_type}\n"
         f"  Output      : {output_file}\n"
+        f"  Config      : {config_label}\n"
         f"  Started     : {started_at}\n"
         f"{'='*70}\n"
     )
@@ -229,54 +346,96 @@ async def run_scraper(
     storage = CosmosStorage() if storage_type == "cosmos" else LocalStorage()
     await storage.connect()
 
-    summary = {"started_at": started_at, "roles": []}
+    # ── Step 1: Pre-generate search terms for ALL roles before scraping ──────────
+    # Doing this upfront avoids LLM calls interleaved with browser sessions and
+    # ensures every firm gets the same search terms for each role.
+
+    if on_progress:
+        on_progress(total_roles=len(roles), firms_total=len(sites))
+
+    role_search_terms: dict[str, list[str]] = {}
+    for i, role in enumerate(roles):
+        if on_progress:
+            on_progress(current_role=role, role_index=i + 1)
+        print(f"\n  Generating search terms for \"{role}\" ...")
+        role_search_terms[role] = await generate_search_terms(role)
+        print(f"  Search terms ({len(role_search_terms[role])}): {', '.join(role_search_terms[role])}")
+
+    # Write search terms block to output file
+    terms_section = [
+        f"\n{'─'*70}",
+        f"  SEARCH TERMS",
+        f"{'─'*70}",
+    ]
+    for role, terms in role_search_terms.items():
+        terms_section.append(f"  {role}: {', '.join(terms)}")
+    with open(output_file, "a", encoding="utf-8") as f:
+        f.write("\n".join(terms_section) + "\n")
+
+    batch_header = (
+        f"\n{'─'*70}\n"
+        f"  Processing {len(sites)} firm(s) × {len(roles)} role(s)  "
+        f"(concurrency={concurrency})\n"
+        f"  Order: firm-first — all roles searched per firm before next firm starts\n"
+        f"{'─'*70}\n"
+    )
+    print(batch_header)
+    with open(output_file, "a", encoding="utf-8") as f:
+        f.write(batch_header)
+
+    # ── Step 2: Run firm-first batch ─────────────────────────────────────────────
+
+    all_results = await run_batch_firm_first(
+        sites             = sites,
+        roles             = roles,
+        concurrency       = concurrency,
+        output_file       = output_file,
+        role_search_terms = role_search_terms,
+        on_progress       = on_progress,
+        storage           = storage,
+        save_every        = 5,
+    )
+
+    # ── Step 3: Build per-role summary ───────────────────────────────────────────
+
+    summary        = {"started_at": started_at, "roles": []}
     total_jobs_all = 0
 
+    summary_lines = [
+        f"\n{'─'*70}",
+        f"  SUMMARY BY ROLE",
+        f"{'─'*70}",
+    ]
     for role in roles:
-        print(f"\n  Generating search terms for \"{role}\" ...")
-        search_terms = await generate_search_terms(role)
-        print(f"  Search terms ({len(search_terms)}): {', '.join(search_terms)}")
-
-        role_header = (
-            f"\n{'-'*70}\n"
-            f"  ROLE: {role.upper()}\n"
-            f"  Search terms: {', '.join(search_terms)}\n"
-            f"  Firms: {len(sites)}\n"
-            f"{'-'*70}\n"
-        )
-        print(role_header)
-        with open(output_file, "a", encoding="utf-8") as f:
-            f.write(role_header)
-
-        all_results = await run_batch(sites, role, concurrency, output_file, search_terms)
-        await storage.save_batch(all_results)
-
-        total_firms   = len({r.firm_name for r in all_results})
-        success_firms = len({r.firm_name for r in all_results if r.status == "success"})
-        total_jobs    = sum(1 for r in all_results if r.status == "success")
-        error_firms   = len({r.firm_name for r in all_results if r.status == "error"})
+        role_results  = [r for r in all_results if r.role_searched == role]
+        total_firms   = len({r.firm_name for r in role_results})
+        success_firms = len({r.firm_name for r in role_results if r.status == "success"})
+        total_jobs    = sum(1 for r in role_results if r.status == "success")
+        error_firms   = len({r.firm_name for r in role_results if r.status == "error"})
         nores_firms   = max(0, total_firms - success_firms - error_firms)
 
-        role_summary_line = (
-            f"\n  [{role.upper()}] "
+        role_line = (
+            f"  [{role.upper()}] "
             f"{success_firms}/{total_firms} firms  |  "
             f"{total_jobs} jobs  |  "
             f"{nores_firms} no results  |  "
-            f"{error_firms} errors\n"
+            f"{error_firms} errors"
         )
-        print(role_summary_line)
-        with open(output_file, "a", encoding="utf-8") as f:
-            f.write(role_summary_line)
+        print(role_line)
+        summary_lines.append(role_line)
 
         summary["roles"].append({
-            "role":          role,
-            "firms_run":     total_firms,
-            "firms_success": success_firms,
-            "jobs_found":    total_jobs,
-            "firms_error":   error_firms,
+            "role":           role,
+            "firms_run":      total_firms,
+            "firms_success":  success_firms,
+            "jobs_found":     total_jobs,
+            "firms_error":    error_firms,
             "firms_noresult": nores_firms,
         })
         total_jobs_all += total_jobs
+
+    if on_progress:
+        on_progress(jobs_found_so_far=total_jobs_all)
 
     finished_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     footer = (
@@ -288,19 +447,21 @@ async def run_scraper(
         f"  Finished    : {finished_at}\n"
         f"{'='*70}\n"
     )
+
     with open(output_file, "a", encoding="utf-8") as f:
+        f.write("\n".join(summary_lines) + "\n")
         f.write(footer)
 
-    # Report actual storage used (CosmosStorage falls back to local if connection fails)
     cosmos_connected = (
         storage_type == "cosmos"
         and hasattr(storage, "container")
         and storage.container is not None
     )
-    save_loc = "Azure Cosmos DB" if cosmos_connected else "results.json (Cosmos unavailable — saved locally)"
+    save_loc = "Azure Cosmos DB" if cosmos_connected else "results.json (local)"
     print(f"\n{'-'*70}")
     print(f"  Done  |  {len(roles)} roles  |  {total_jobs_all} total jobs  |  finished {finished_at}")
-    print(f"  Results -> {output_file}  |  Storage -> {save_loc}")
+    print(f"  TXT  -> {output_file}")
+    print(f"  DB   -> {save_loc}")
     print(f"{'-'*70}\n")
 
     await storage.close()
@@ -313,19 +474,28 @@ async def run_scraper(
 # ── CLI entry point ────────────────────────────────────────────────────────────
 
 async def main():
-    env_strategy    = os.getenv("STRATEGY",    "videsktop")
+    env_strategy    = os.getenv("STRATEGY",     "videsktop")
     env_concurrency = int(os.getenv("CONCURRENCY", "5"))
-    env_output      = os.getenv("OUTPUT_FILE",  "output.txt")
-    env_storage     = os.getenv("STORAGE",      "local")
-    env_site_filter = os.getenv("SITE_FILTER",  "all")
+    env_output      = os.getenv("OUTPUT_FILE",   "output.txt")
+    env_storage     = os.getenv("STORAGE",       "local")
+    env_site_filter = os.getenv("SITE_FILTER",   "all")
+    env_firms_cfg   = os.getenv("FIRMS_CONFIG",  "")
 
     parser = argparse.ArgumentParser(description="HR Salary Scraper")
-    parser.add_argument("--strategy",    type=str, default=env_strategy,
-                        choices=["videsktop", "all", "workday", "icims", "ultipro", "florecruit", "direct"])
-    parser.add_argument("--concurrency", type=int, default=env_concurrency)
-    parser.add_argument("--output",      type=str, default=env_output)
-    parser.add_argument("--storage",     type=str, default=env_storage, choices=["local", "cosmos"])
-    parser.add_argument("--filter",      type=str, default=env_site_filter)
+    parser.add_argument(
+        "--strategy", type=str, default=env_strategy,
+        choices=["videsktop", "workday", "icims", "ultipro", "florecruit", "direct", "all"],
+    )
+    parser.add_argument("--concurrency",  type=int, default=env_concurrency)
+    parser.add_argument("--output",       type=str, default=env_output)
+    parser.add_argument("--storage",      type=str, default=env_storage, choices=["local", "cosmos"])
+    parser.add_argument("--filter",       type=str, default=env_site_filter)
+    parser.add_argument(
+        "--firms-config", type=str, default=env_firms_cfg or None,
+        metavar="PATH",
+        help="Path to firms JSON config (default: config/all_firms.json). "
+             "Use config/all_firms_test.json for local 5-firm testing.",
+    )
     args = parser.parse_args()
 
     await run_scraper(
@@ -334,6 +504,7 @@ async def main():
         concurrency  = args.concurrency,
         output_file  = args.output,
         storage_type = args.storage,
+        firms_config = args.firms_config,
     )
 
 

@@ -3,33 +3,55 @@ Azure Function App entry point.
 
 Functions:
     scheduled_scrape  — Timer trigger, runs daily at 12:00 AM IST (18:30 UTC)
-    http_trigger      — HTTP trigger, manual test via POST /api/trigger
+    http_trigger      — POST /api/trigger  — starts a run, returns 202 immediately
+    status_trigger    — GET  /api/status   — check current run progress
 
 Local testing:
     func start
 
-HTTP test (PowerShell):
-    # Full run (all roles, all firms from STRATEGY env):
-    Invoke-RestMethod -Method POST -Uri "http://localhost:7071/api/trigger"
-
-    # Targeted test (one firm, one role):
+Trigger a test (PowerShell):
     Invoke-RestMethod -Method POST -Uri "http://localhost:7071/api/trigger" `
       -ContentType "application/json" `
       -Body '{"strategy":"videsktop","filter":"Jones Day","roles":["paralegal"]}'
+
+Check status:
+    Invoke-RestMethod -Uri "http://localhost:7071/api/status"
 """
 
 import logging
 import os
 import json
+import asyncio
+from datetime import datetime, timezone
 
 import azure.functions as func
 
 app = func.FunctionApp()
 
+# ── In-memory run state ────────────────────────────────────────────────────────
+_run_state: dict = {
+    "status":      "idle",      # idle | running | completed | failed
+    "started_at":  None,
+    "finished_at": None,
+    "strategy":    None,
+    "filter":      None,
+    "roles":       [],
+    "progress": {
+        "current_role":       None,
+        "role_index":         0,
+        "total_roles":        0,
+        "current_firm":       None,
+        "firms_done":         0,
+        "firms_total":        0,
+        "jobs_found_so_far":  0,
+    },
+    "summary":     None,
+    "error":       None,
+}
+_background_task = None
 
-# ── Timer trigger — runs daily at 12:00 AM IST (18:30 UTC) ───────────────────
-# Azure Functions CRON format: {second} {minute} {hour} {day} {month} {weekday}
-# 18:30 UTC = 00:00 IST (midnight)
+
+# ── Timer trigger — daily at 12:00 AM IST (18:30 UTC) ─────────────────────────
 
 @app.timer_trigger(
     schedule="0 30 18 * * *",
@@ -39,30 +61,40 @@ app = func.FunctionApp()
 async def scheduled_scrape(timer: func.TimerRequest) -> None:
     """Scheduled daily run — reads roles from config/roles.json."""
     if timer.past_due:
-        logging.info("Timer trigger is past due — running now.")
-
+        logging.info("Timer is past due — running now.")
     logging.info("Scheduled scrape started.")
-    from main import run_scraper
-    await run_scraper()
+    await _execute_scrape(
+        strategy    = os.getenv("STRATEGY",    "videsktop"),
+        site_filter = os.getenv("SITE_FILTER", "all"),
+        roles       = None,
+    )
     logging.info("Scheduled scrape completed.")
 
 
-# ── HTTP trigger — manual test ────────────────────────────────────────────────
+# ── HTTP trigger — manual start ────────────────────────────────────────────────
 
-@app.route(route="trigger", methods=["GET", "POST"])
+@app.route(route="trigger", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
 async def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
     """
-    Manual trigger for testing.
+    Start a scrape run in the background. Returns 202 immediately.
+    Poll GET /api/status to track progress.
 
     Optional JSON body:
-        {
-          "strategy": "videsktop",        // default: STRATEGY env var
-          "filter":   "Jones Day",        // default: all firms
-          "roles":    ["paralegal"]        // default: config/roles.json
-        }
-
-    For a quick test, pass a filter to limit to 1 firm so it finishes in ~2 min.
+        { "strategy": "videsktop", "filter": "Jones Day", "roles": ["paralegal"] }
     """
+    global _background_task, _run_state
+
+    if _run_state["status"] == "running":
+        return func.HttpResponse(
+            json.dumps({
+                "status":  "already_running",
+                "message": "A scrape is already in progress. Poll /api/status for updates.",
+                "run":     _run_state,
+            }),
+            status_code=409,
+            mimetype="application/json",
+        )
+
     body = {}
     try:
         body = req.get_json()
@@ -71,9 +103,82 @@ async def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
 
     strategy    = body.get("strategy") or os.getenv("STRATEGY",    "videsktop")
     site_filter = body.get("filter")   or os.getenv("SITE_FILTER", "all")
-    roles       = body.get("roles")    or None  # None = read from roles.json
+    roles       = body.get("roles")    or None
 
-    logging.info(f"HTTP trigger: strategy={strategy} filter={site_filter} roles={roles}")
+    # Reset state
+    _run_state.update({
+        "status":      "running",
+        "started_at":  datetime.now(timezone.utc).isoformat(),
+        "finished_at": None,
+        "strategy":    strategy,
+        "filter":      site_filter,
+        "roles":       roles or [],
+        "progress": {
+            "current_role":      None,
+            "role_index":        0,
+            "total_roles":       0,
+            "current_firm":      None,
+            "firms_done":        0,
+            "firms_total":       0,
+            "jobs_found_so_far": 0,
+        },
+        "summary":     None,
+        "error":       None,
+    })
+
+    _background_task = asyncio.create_task(
+        _execute_scrape(strategy, site_filter, roles)
+    )
+
+    logging.info(f"Scrape started: strategy={strategy} filter={site_filter} roles={roles}")
+
+    return func.HttpResponse(
+        json.dumps({
+            "status":  "started",
+            "message": "Scrape started in background. Poll GET /api/status for progress.",
+            "run":     _run_state,
+        }),
+        status_code=202,
+        mimetype="application/json",
+    )
+
+
+# ── Status endpoint ────────────────────────────────────────────────────────────
+
+@app.route(route="status", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+async def status_trigger(req: func.HttpRequest) -> func.HttpResponse:
+    """Return current run state including live progress."""
+    return func.HttpResponse(
+        json.dumps(_run_state, indent=2),
+        status_code=200,
+        mimetype="application/json",
+    )
+
+
+# ── Core scrape runner ─────────────────────────────────────────────────────────
+
+async def _execute_scrape(strategy: str, site_filter: str, roles):
+    """Run the scraper and update _run_state on completion."""
+    global _run_state
+
+    def on_progress(
+        current_role=None,
+        role_index=None,
+        total_roles=None,
+        current_firm=None,
+        firms_done=None,
+        firms_total=None,
+        jobs_found_so_far=None,
+    ):
+        """Called by run_scraper/run_batch to update live progress."""
+        p = _run_state["progress"]
+        if current_role      is not None: p["current_role"]      = current_role
+        if role_index        is not None: p["role_index"]        = role_index
+        if total_roles       is not None: p["total_roles"]       = total_roles
+        if current_firm      is not None: p["current_firm"]      = current_firm
+        if firms_done        is not None: p["firms_done"]        = firms_done
+        if firms_total       is not None: p["firms_total"]       = firms_total
+        if jobs_found_so_far is not None: p["jobs_found_so_far"] = jobs_found_so_far
 
     try:
         from main import run_scraper
@@ -81,16 +186,18 @@ async def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
             strategy    = strategy,
             site_filter = site_filter,
             roles       = roles,
+            on_progress = on_progress,
         )
-        return func.HttpResponse(
-            json.dumps(summary, indent=2),
-            status_code=200,
-            mimetype="application/json",
-        )
+        _run_state.update({
+            "status":      "completed",
+            "finished_at": datetime.now(timezone.utc).isoformat(),
+            "summary":     summary,
+        })
+        logging.info(f"Scrape completed: {summary.get('total_jobs', 0)} jobs found.")
     except Exception as e:
+        _run_state.update({
+            "status":      "failed",
+            "finished_at": datetime.now(timezone.utc).isoformat(),
+            "error":       str(e)[:500],
+        })
         logging.error(f"Scrape failed: {e}")
-        return func.HttpResponse(
-            json.dumps({"error": str(e)}),
-            status_code=500,
-            mimetype="application/json",
-        )

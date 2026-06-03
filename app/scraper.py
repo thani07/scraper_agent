@@ -649,6 +649,7 @@ async def scrape_site(site: SiteConfig, role: str, search_terms: list[str] | Non
             headless=headless,
             disable_security=True,
             viewport={"width": 1280, "height": 900},
+            chromium_sandbox=False,
         )
 
         llm = get_llm()
