@@ -7,9 +7,9 @@
   },
   {
     "name": "Greenspoon Marder",
-    "careers_url": "https://www.greenspoon.com/careers",
+    "careers_url": "https://www.greenspoonmarder.com/careers",
     "strategy": "videsktop",
-    "navigation_hints": "Navigates to greenspoon.com/careers and scans hrefs for greenspoonmarder-apply.viglobalcloud.com. Permanent URL: FilterREID=2&FilterJobCategoryID=2 (never expires). Grid: #contentPlaceHolder_gridviewList. Searches via #contentPlaceHolder_textKeyWord."
+    "navigation_hints": "Navigates to greenspoonmarder.com/careers and scans hrefs for greenspoonmarder-apply.viglobalcloud.com. Permanent URL: FilterREID=2&FilterJobCategoryID=2 (never expires). Grid: #contentPlaceHolder_gridviewList. Searches via #contentPlaceHolder_textKeyWord."
   },
   {
     "name": "Womble Bond Dickinson",

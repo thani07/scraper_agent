@@ -583,6 +583,9 @@ async def scrape_site(site: SiteConfig, role: str, search_terms: list[str] | Non
     """
     Scrape a single site for a given role using Browser-Use agent.
 
+    Retries up to MAX_RETRIES times on transient network errors
+    (DNS failure, connection timeout, ERR_ABORTED).
+
     search_terms: full list of terms to search on this site (user role + AI alternatives).
                   The agent searches EVERY term and combines all results.
                   If None, falls back to _expand_search_terms(role).
@@ -591,6 +594,45 @@ async def scrape_site(site: SiteConfig, role: str, search_terms: list[str] | Non
     videsktop strategy uses multi-job extraction ({"jobs": [...]}) so may return
     multiple results. All other strategies return a single-element list.
     """
+    max_retries = int(os.getenv("MAX_RETRIES", "2"))
+    retry_delay = float(os.getenv("RETRY_DELAY_SEC", "15"))
+
+    # Errors that are transient and worth retrying
+    _RETRYABLE = (
+        "ERR_NAME_NOT_RESOLVED",
+        "ERR_ABORTED",
+        "ERR_CONNECTION_REFUSED",
+        "ERR_CONNECTION_RESET",
+        "ERR_CONNECTION_TIMED_OUT",
+        "Timeout",
+        "net::ERR",
+    )
+
+    last_result = None
+    for attempt in range(max_retries + 1):
+        if attempt > 0:
+            print(f"  [RETRY] {site.name} role={role} attempt {attempt}/{max_retries} (waiting {retry_delay}s)")
+            await asyncio.sleep(retry_delay)
+
+        result = await _scrape_site_once(site, role, search_terms)
+
+        # If success or no_results — done, no retry needed
+        if result and result[0].status != "error":
+            return result
+
+        # Check if the error is retryable
+        err_msg = (result[0].error_message or "") if result else ""
+        if any(tag in err_msg for tag in _RETRYABLE):
+            last_result = result
+            continue  # retry
+        else:
+            return result  # non-retryable error (e.g. auth, parsing) — return immediately
+
+    return last_result or []
+
+
+async def _scrape_site_once(site: SiteConfig, role: str, search_terms: list[str] | None = None) -> list:
+    """Single attempt to scrape a site. Called by scrape_site with retry logic."""
     start_time = time.time()
     strategy = get_strategy(site.strategy)
 
@@ -650,6 +692,8 @@ async def scrape_site(site: SiteConfig, role: str, search_terms: list[str] | Non
             disable_security=True,
             viewport={"width": 1280, "height": 900},
             chromium_sandbox=False,
+            default_navigation_timeout=60000,   # 60s page load timeout (default is 30s)
+            default_timeout=60000,              # 60s for all Playwright waits
         )
 
         llm = get_llm()
@@ -659,7 +703,7 @@ async def scrape_site(site: SiteConfig, role: str, search_terms: list[str] | Non
         #   15 jobs × 3 steps = 45 + 15 overhead = 60 steps.
         # Other strategies extract one job and need far fewer steps.
         is_videsktop = (site.strategy.value == "videsktop")
-        max_steps = 60 if is_videsktop else 20
+        max_steps = 60 if is_videsktop else 40
 
         # videsktop uses ASP.NET WebForms — every Search/click triggers a full page reload
         # (postback). If the LLM batches 3 actions in one step, action 1 fires the postback,
@@ -777,59 +821,39 @@ async def scrape_site(site: SiteConfig, role: str, search_terms: list[str] | Non
         if verbose and convo_path:
             print(f"  Conversation log -> {convo_path}")
 
-        # videsktop uses {"jobs": [...]} multi-job format; all other strategies
-        # use single-job format. Both paths return a list of ScrapeResult.
-        if is_videsktop:
-            extractions = parse_multi_extraction(str(final) if final else "", role, last_url[0])
-            if not extractions:
-                # No jobs found at all
-                return [ScrapeResult(
-                    firm_name=site.name,
-                    strategy_used=site.strategy.value,
-                    role_searched=role,
-                    status="no_results",
-                    scrape_duration_sec=duration,
-                )]
-            site_results = []
-            for extraction in extractions:
-                # Fix viDesktop job URLs: the LLM often records page.url which stays at
-                # RecDefault.aspx after a postback click. The real job URL is identical
-                # except RecDefault.aspx → RecApplicantEmail.aspx (same Tag, same host).
-                # Also strip any #job-N fallback fragment added by the last-resort rule.
-                if extraction.job_url and "RecDefault.aspx" in extraction.job_url:
-                    fixed = extraction.job_url.split("#")[0]
-                    fixed = fixed.replace("RecDefault.aspx", "RecApplicantEmail.aspx")
-                    extraction.job_url = fixed
+        # All strategies now use {"jobs": [...]} multi-job format.
+        # parse_multi_extraction handles both {"jobs":[...]} and single-job fallback.
+        extractions = parse_multi_extraction(str(final) if final else "", role, last_url[0])
+        if not extractions:
+            return [ScrapeResult(
+                firm_name=site.name,
+                strategy_used=site.strategy.value,
+                role_searched=role,
+                status="no_results",
+                scrape_duration_sec=duration,
+            )]
 
-                _no_job = (
-                    not extraction.role_title
-                    or extraction.role_title.strip().lower() in ("no results found", "")
-                )
-                site_results.append(ScrapeResult(
-                    firm_name=site.name,
-                    strategy_used=site.strategy.value,
-                    role_searched=role,
-                    extraction=extraction,
-                    status="no_results" if _no_job else "success",
-                    scrape_duration_sec=duration,
-                ))
-            return site_results
-        else:
-            # Single-job strategies
-            extraction = parse_extraction(str(final) if final else "", role, last_url[0]) if final else None
+        site_results = []
+        for extraction in extractions:
+            # Fix viDesktop job URLs: page.url stays at RecDefault.aspx after postback.
+            if is_videsktop and extraction.job_url and "RecDefault.aspx" in extraction.job_url:
+                fixed = extraction.job_url.split("#")[0]
+                fixed = fixed.replace("RecDefault.aspx", "RecApplicantEmail.aspx")
+                extraction.job_url = fixed
+
             _no_job = (
-                not extraction
-                or not extraction.role_title
+                not extraction.role_title
                 or extraction.role_title.strip().lower() in ("no results found", "")
             )
-            return [ScrapeResult(
+            site_results.append(ScrapeResult(
                 firm_name=site.name,
                 strategy_used=site.strategy.value,
                 role_searched=role,
                 extraction=extraction,
                 status="no_results" if _no_job else "success",
                 scrape_duration_sec=duration,
-            )]
+            ))
+        return site_results
 
     except asyncio.TimeoutError:
         duration = round(time.time() - start_time, 2)

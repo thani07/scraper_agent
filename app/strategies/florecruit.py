@@ -5,11 +5,6 @@ from .base import BaseStrategy
 
 
 class FloRecruitStrategy(BaseStrategy):
-    """
-    Starts on the firm's main careers page.
-    The LLM navigates to the jobs section, which links to a FLO Recruit portal
-    (florecruit.com), then scrolls through the React SPA to find and extract the role.
-    """
 
     def get_initial_actions(self, role: str, url: str) -> List[dict]:
         return [
@@ -20,46 +15,57 @@ class FloRecruitStrategy(BaseStrategy):
     def get_extraction_task(self, role: str, url: str) -> str:
         return f"""
 You are on a law firm careers page at {url}.
-Your goal is to find salary and job details for the role: "{role}".
+Your goal is to find ALL jobs matching "{role}" and extract salary, experience, location, and URL for EVERY match.
 
 STEP 1 — FIND THE CAREERS / JOBS SECTION
-- Look for a link to "Careers", "Open Positions", "Job Openings", "Staff Openings",
-  or a "Join Our Team" section.
-- Click it. It may redirect to a FLO Recruit portal
-  (the URL will contain "florecruit.com/v2/app/").
+- Look for a link to "Careers", "Open Positions", "Job Openings", "Staff Openings", or "Join Our Team".
+- Click it. It may redirect to a FLO Recruit portal (URL contains "florecruit.com/v2/app/").
 - All jobs on FLO Recruit portals are Professional Staff roles — no filtering needed.
 
-STEP 2 — YOU ARE NOW ON FLO RECRUIT (florecruit.com)
+STEP 2 — YOU ARE NOW ON FLO RECRUIT
 - This is a React Single Page Application. Wait for job cards to appear.
-- All available jobs are listed as cards on the page. There may be no search box —
-  scroll through all cards to find "{role}" or the closest matching role.
-- Each card shows a job title, location, and brief description.
+- Scroll through ALL visible job cards to see every available role.
+- There may be no search box — scan all cards by title.
 
-STEP 3 — OPEN THE JOB DETAIL
-- Click the card or job title link for the best match to "{role}".
-- On the detail page, look for:
-  - Job title: heading near the top
-  - Salary: in the description body or in a "Job details" list — look for "$X,XXX"
-    or "$XX/hr" patterns. Location is often the second item in the job details list.
-  - Experience: in "Requirements" or "Qualifications" sections
-  - Location: in a "Job details" list (usually the second list item) or near the title
-  - Department: shown as a tag or category
+STEP 3 — COLLECT ALL MATCHING JOBS
+- Identify ALL cards whose title matches or is related to "{role}".
+- For each matching card:
+  - Click the card or job title to open the detail page.
+  - Extract: title, salary, experience, location, department, and the page URL.
+  - Click the browser Back button to return to the job list.
+  - Continue to the next matching card.
+- Collect up to 10 matching jobs.
+- If NO exact match exists, pick the closest staff role available.
+
+STEP 4 — EXTRACT FROM EACH JOB DETAIL
+For each job, extract:
+- Job title: main heading at the top
+- Salary: in the description or "Job details" list — look for "$X,XXX" or "$XX/hr". Use "Not listed" if absent.
+- Experience: in "Requirements" or "Qualifications"
+- Location: in "Job details" list (usually second item) or near the title
+- Department: tag or category label
+- URL: the full page URL of the job detail
 
 RULES:
 - Do NOT click the same element more than once.
-- Maximum 20 actions total.
-- If no match found, return the closest available staff role.
+- Maximum 40 actions total.
+- If 0 jobs found, return {{"jobs": []}}.
 
-Return ONLY a valid JSON object:
+Return ONLY a valid JSON object with no text before or after it:
 {{
-  "role_title": "exact title or 'No results found'",
-  "salary_min": "minimum salary or null",
-  "salary_max": "maximum salary or null",
-  "salary_raw": "raw salary text or 'Not listed' if absent",
-  "experience_years": "e.g. '3-5 years' or null",
-  "experience_raw": "raw experience text or null",
-  "location": "city/state or null",
-  "job_url": "current page URL of the job detail",
-  "practice_area": "department or null"
+  "jobs": [
+    {{
+      "role_title": "exact title from job detail",
+      "salary_min": "minimum salary as '$X,XXX' or null",
+      "salary_max": "maximum salary as '$X,XXX' or null",
+      "salary_raw": "raw salary text or 'Not listed'",
+      "is_hourly": false,
+      "experience_years": "e.g. '3-5 years' or null",
+      "experience_raw": "raw experience text or null",
+      "location": "City, ST or null",
+      "job_url": "full URL of this job detail page",
+      "practice_area": "department or null"
+    }}
+  ]
 }}
 """

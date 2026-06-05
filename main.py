@@ -40,7 +40,7 @@ os.environ.setdefault("ANONYMIZED_TELEMETRY", "false")
 
 from app.models import SiteConfig, ScrapeResult
 from app.scraper import scrape_site, generate_search_terms
-from app.storage import CosmosStorage, LocalStorage
+from app.storage import CosmosStorage, LocalStorage, CrawlStorage, _generate_crawl_id, _build_crawl_job
 
 
 CONFIG_DIR       = os.path.join(os.path.dirname(__file__), "config")
@@ -310,12 +310,11 @@ async def run_scraper(
     os.environ["SAVE_CONVERSATION"]    = os.getenv("SAVE_CONVERSATION", "false")
     os.environ["HEADLESS"]             = os.getenv("HEADLESS",          "true")
 
-    strategy     = strategy     or os.getenv("STRATEGY",    "videsktop")
+    strategy     = strategy     or os.getenv("STRATEGY",    "all")
     site_filter  = site_filter  or os.getenv("SITE_FILTER", "all")
     concurrency  = concurrency  or int(os.getenv("CONCURRENCY", "5"))
     output_file  = output_file  or os.getenv("OUTPUT_FILE",  "output.txt")
-    storage_type = storage_type or os.getenv("STORAGE",      "local")
-    roles        = roles        or load_roles()
+    storage_type = storage_type or os.getenv("STORAGE",      "cosmos")
     firms_config = firms_config or os.getenv("FIRMS_CONFIG") or None
 
     sites = load_sites(strategy, site_filter, firms_config)
@@ -325,10 +324,45 @@ async def run_scraper(
     started_at   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     config_label = os.path.basename(firms_config) if firms_config else "all_firms.json"
 
+    # ── Step 1: Load roles + search terms ────────────────────────────────────────
+
+    crawl_storage: CrawlStorage | None = None
+    role_docs:     list[dict]          = []
+    role_search_terms: dict[str, list[str]] = {}
+
+    if storage_type == "cosmos":
+        # NEW FLOW: read roles from analyses container, use similar_roles as search terms
+        crawl_storage = CrawlStorage()
+        await crawl_storage.connect()
+
+        role_docs = await crawl_storage.read_analyses()
+        if not role_docs:
+            raise ValueError("No role documents found in the analyses container.")
+
+        roles = [doc["role"] for doc in role_docs]
+        role_search_terms = {
+            doc["role"]: doc.get("similar_roles") or [doc["role"]]
+            for doc in role_docs
+        }
+        save_storage = None  # results are aggregated per-role and saved after the batch
+    else:
+        # LOCAL FALLBACK: use roles.json + LLM-generated search terms
+        local_storage = LocalStorage()
+        await local_storage.connect()
+        save_storage = local_storage
+
+        roles = roles or load_roles()
+        for i, role in enumerate(roles):
+            if on_progress:
+                on_progress(current_role=role, role_index=i + 1)
+            print(f"\n  Generating search terms for \"{role}\" ...")
+            role_search_terms[role] = await generate_search_terms(role)
+            print(f"  Search terms ({len(role_search_terms[role])}): {', '.join(role_search_terms[role])}")
+
     run_header = (
         f"\n{'='*70}\n"
         f"  HR SALARY SCRAPER\n"
-        f"  Roles       : {', '.join(roles)}\n"
+        f"  Roles       : {len(roles)} role(s)\n"
         f"  Strategy    : {strategy}\n"
         f"  Firms       : {len(sites)}\n"
         f"  Concurrency : {concurrency}\n"
@@ -343,34 +377,19 @@ async def run_scraper(
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(run_header)
 
-    storage = CosmosStorage() if storage_type == "cosmos" else LocalStorage()
-    await storage.connect()
-
-    # ── Step 1: Pre-generate search terms for ALL roles before scraping ──────────
-    # Doing this upfront avoids LLM calls interleaved with browser sessions and
-    # ensures every firm gets the same search terms for each role.
-
-    if on_progress:
-        on_progress(total_roles=len(roles), firms_total=len(sites))
-
-    role_search_terms: dict[str, list[str]] = {}
-    for i, role in enumerate(roles):
-        if on_progress:
-            on_progress(current_role=role, role_index=i + 1)
-        print(f"\n  Generating search terms for \"{role}\" ...")
-        role_search_terms[role] = await generate_search_terms(role)
-        print(f"  Search terms ({len(role_search_terms[role])}): {', '.join(role_search_terms[role])}")
-
     # Write search terms block to output file
     terms_section = [
         f"\n{'─'*70}",
-        f"  SEARCH TERMS",
+        f"  SEARCH TERMS (from {'analyses container' if storage_type == 'cosmos' else 'roles.json + LLM'})",
         f"{'─'*70}",
     ]
     for role, terms in role_search_terms.items():
-        terms_section.append(f"  {role}: {', '.join(terms)}")
+        terms_section.append(f"  {role}: {', '.join(terms[:5])}{'...' if len(terms) > 5 else ''}")
     with open(output_file, "a", encoding="utf-8") as f:
         f.write("\n".join(terms_section) + "\n")
+
+    if on_progress:
+        on_progress(total_roles=len(roles), firms_total=len(sites))
 
     batch_header = (
         f"\n{'─'*70}\n"
@@ -392,11 +411,11 @@ async def run_scraper(
         output_file       = output_file,
         role_search_terms = role_search_terms,
         on_progress       = on_progress,
-        storage           = storage,
+        storage           = save_storage,   # None in cosmos mode; saves happen post-batch
         save_every        = 5,
     )
 
-    # ── Step 3: Build per-role summary ───────────────────────────────────────────
+    # ── Step 3: Build per-role summary + Cosmos save ──────────────────────────────
 
     summary        = {"started_at": started_at, "roles": []}
     total_jobs_all = 0
@@ -406,6 +425,10 @@ async def run_scraper(
         f"  SUMMARY BY ROLE",
         f"{'─'*70}",
     ]
+
+    # Build role→doc_id lookup for analyses updates
+    role_to_doc_id = {doc["role"]: doc["id"] for doc in role_docs}
+
     for role in roles:
         role_results  = [r for r in all_results if r.role_searched == role]
         total_firms   = len({r.firm_name for r in role_results})
@@ -434,6 +457,15 @@ async def run_scraper(
         })
         total_jobs_all += total_jobs
 
+        # Save crawl result + update analyses doc (cosmos mode)
+        if crawl_storage:
+            jobs      = [_build_crawl_job(r, role) for r in role_results if r.status == "success"]
+            crawl_id  = _generate_crawl_id(role)
+            await crawl_storage.save_crawl_result(crawl_id, role, jobs)
+            doc_id = role_to_doc_id.get(role)
+            if doc_id:
+                await crawl_storage.update_analysis(doc_id, crawl_id)
+
     if on_progress:
         on_progress(jobs_found_so_far=total_jobs_all)
 
@@ -441,7 +473,7 @@ async def run_scraper(
     footer = (
         f"\n{'='*70}\n"
         f"  Run complete\n"
-        f"  Roles       : {len(roles)} ({', '.join(roles)})\n"
+        f"  Roles       : {len(roles)}\n"
         f"  Firms       : {len(sites)}\n"
         f"  Total jobs  : {total_jobs_all}\n"
         f"  Finished    : {finished_at}\n"
@@ -452,19 +484,17 @@ async def run_scraper(
         f.write("\n".join(summary_lines) + "\n")
         f.write(footer)
 
-    cosmos_connected = (
-        storage_type == "cosmos"
-        and hasattr(storage, "container")
-        and storage.container is not None
-    )
-    save_loc = "Azure Cosmos DB" if cosmos_connected else "results.json (local)"
+    save_loc = "Azure Cosmos DB (analyses → agent_job_results)" if crawl_storage else "results.json (local)"
     print(f"\n{'-'*70}")
     print(f"  Done  |  {len(roles)} roles  |  {total_jobs_all} total jobs  |  finished {finished_at}")
     print(f"  TXT  -> {output_file}")
     print(f"  DB   -> {save_loc}")
     print(f"{'-'*70}\n")
 
-    await storage.close()
+    if crawl_storage:
+        await crawl_storage.close()
+    elif save_storage:
+        await save_storage.close()
 
     summary["finished_at"] = finished_at
     summary["total_jobs"]  = total_jobs_all
