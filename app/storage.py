@@ -3,6 +3,7 @@
 import os
 import json
 import uuid
+import asyncio
 import hashlib
 from datetime import datetime, timezone
 
@@ -334,7 +335,13 @@ class CrawlStorage:
         return items
 
     async def save_crawl_result(self, crawl_id: str, role: str, jobs: list[dict]) -> None:
-        """Upsert a crawl result document into agent_job_results."""
+        """Upsert a crawl result document into agent_job_results.
+
+        Retries up to 3 times with exponential backoff to handle transient
+        Cosmos DB errors (429 RU throttling, 503 service unavailable, timeouts).
+        Raises RuntimeError after all retries are exhausted so the caller knows
+        the data was NOT saved.
+        """
         doc = {
             "id":          crawl_id,
             "crawled_by":  "ai_agent",
@@ -345,8 +352,26 @@ class CrawlStorage:
             "job_count":   len(jobs),
             "jobs":        jobs,
         }
-        await self.results_container.upsert_item(doc)
-        print(f"  [DB] Saved crawl doc {crawl_id}  ({len(jobs)} jobs)  role='{role}'")
+
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
+            try:
+                await self.results_container.upsert_item(doc)
+                print(f"  [DB] Saved crawl doc {crawl_id}  ({len(jobs)} jobs)  role='{role}'")
+                return
+            except Exception as e:
+                err = str(e)
+                is_throttle = "429" in err or "TooManyRequests" in err or "RequestRateTooLarge" in err
+                is_transient = is_throttle or "503" in err or "timeout" in err.lower() or "connect" in err.lower()
+
+                if attempt < max_retries and is_transient:
+                    wait = 2 ** attempt  # 2s, 4s, 8s
+                    print(f"  [DB][RETRY] Save failed (attempt {attempt}/{max_retries}), retrying in {wait}s: {err[:120]}")
+                    await asyncio.sleep(wait)
+                else:
+                    raise RuntimeError(
+                        f"  [DB][FAIL] Could not save crawl doc '{crawl_id}' after {attempt} attempt(s): {err[:200]}"
+                    ) from e
 
     async def update_analysis(self, doc_id: str, crawl_id: str) -> None:
         """Update analyses doc by upserting the modified in-memory copy.

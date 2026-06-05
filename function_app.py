@@ -136,13 +136,22 @@ async def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
         "error":       None,
     })
 
+    # Fire as background task — return 202 immediately.
+    # DO NOT use await here: Azure kills the coroutine after the 230s HTTP
+    # response timeout, causing the host to recycle and the run to die silently.
+    # Background task keeps running as long as the host process stays alive.
+    asyncio.get_event_loop().create_task(
+        _execute_scrape(strategy, site_filter, roles, firms_config)
+    )
     logging.info(f"Scrape started: strategy={strategy} filter={site_filter} roles={roles} firms_config={firms_config}")
-    await _execute_scrape(strategy, site_filter, roles, firms_config)
 
-    status_code = 200 if _run_state["status"] in ("completed", "aborted") else 500
     return func.HttpResponse(
-        json.dumps({"run": _run_state}),
-        status_code=status_code,
+        json.dumps({
+            "status":  "started",
+            "message": "Scrape running in background. Poll GET /api/status for progress. POST /api/stop to abort.",
+            "progress": _run_state["progress"],
+        }),
+        status_code=202,
         mimetype="application/json",
     )
 
