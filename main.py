@@ -149,6 +149,9 @@ async def run_batch_firm_first(
     on_progress=None,
     storage=None,
     save_every: int = 5,
+    crawl_storage=None,
+    save_every_jobs: int = 20,
+    stop_check=None,
 ) -> list[ScrapeResult]:
     """
     Process firms concurrently. For each firm, ALL roles are searched sequentially.
@@ -159,19 +162,26 @@ async def run_batch_firm_first(
         Slot 3: [Firm C] paralegal → litigation → business development
         (Firm D starts once any slot frees up)
 
-    Benefits vs role-first:
-      - Every firm is guaranteed to get all roles — no role starvation on timeout
-      - At most `concurrency` browsers open simultaneously (not concurrency × roles)
-      - Output file shows all roles per firm grouped together
+    crawl_storage  : CrawlStorage instance — when set, jobs are upserted to
+                     agent_job_results every `save_every_jobs` jobs per role.
+    save_every_jobs: upsert each role's crawl doc after this many jobs accumulate.
+                     Default 20 — safe for large runs (no data loss if job crashes mid-run).
+    stop_check     : callable() -> bool — when it returns True, no new firms are started
+                     and the batch exits after active firms finish their current role.
     """
     semaphore       = asyncio.Semaphore(concurrency)
     total           = len(sites)
+    aborted         = [False]
     done_count      = [0]
     total_jobs_live = [0]
     all_results: list[ScrapeResult] = []
     pending_save: list[ScrapeResult] = []
     file_lock   = asyncio.Lock()
     save_lock   = asyncio.Lock()
+
+    # Per-role job buffer for incremental Cosmos upserts
+    # Protected by save_lock — same lock used for pending_save flush
+    role_jobs_buffer: dict[str, list] = {role: [] for role in roles}
 
     if on_progress:
         on_progress(firms_total=total)
@@ -189,8 +199,40 @@ async def run_batch_firm_first(
                 except Exception as e:
                     print(f"  [DB][WARN] Save failed: {e}")
 
+    async def flush_crawl_jobs(role: str, force: bool = False):
+        """
+        Upsert the crawl doc for a role when its buffer hits save_every_jobs.
+        Set force=True to upsert regardless of count (used at end of run).
+        Protected by save_lock — caller must NOT hold save_lock when calling this.
+        """
+        if not crawl_storage:
+            return
+        async with save_lock:
+            jobs = role_jobs_buffer.get(role, [])
+            if not jobs:
+                return
+            if not force and len(jobs) < save_every_jobs:
+                return
+            crawl_id = _generate_crawl_id(role)
+            try:
+                await crawl_storage.save_crawl_result(crawl_id, role, list(jobs))
+            except Exception as e:
+                print(f"  [DB][WARN] Incremental save failed for role '{role}': {e}")
+
     async def process_firm(site: SiteConfig) -> list[ScrapeResult]:
+        # Check stop flag before waiting for a semaphore slot.
+        # Firms already inside the semaphore finish their current role first.
+        if stop_check and stop_check():
+            aborted[0] = True
+            return []
+
         async with semaphore:
+            # Re-check after acquiring the slot — stop may have been requested
+            # while this firm was queued waiting for a free slot.
+            if stop_check and stop_check():
+                aborted[0] = True
+                return []
+
             if on_progress:
                 on_progress(current_firm=site.name)
 
@@ -248,8 +290,21 @@ async def run_batch_firm_first(
                     f.write("\n".join(lines) + "\n")
                 pending_save.extend(firm_results)
 
+                # Accumulate new success jobs into per-role buffer
+                if crawl_storage:
+                    for r in firm_results:
+                        if r.status == "success":
+                            role_jobs_buffer[r.role_searched].append(
+                                _build_crawl_job(r, r.role_searched)
+                            )
+
             if done_count[0] % save_every == 0:
                 await flush_pending()
+
+            # Upsert any role whose buffer has hit the threshold
+            if crawl_storage:
+                for role in roles:
+                    await flush_crawl_jobs(role)
 
             return firm_results
 
@@ -270,11 +325,25 @@ async def run_batch_firm_first(
         else:
             all_results.extend(r)
 
-    # Final flush for any remaining unsaved results
+    # Final flush — save remaining jobs in buffer regardless of count
     if pending_save:
         await flush_pending()
+    if crawl_storage:
+        for role in roles:
+            await flush_crawl_jobs(role, force=True)
 
-    return all_results
+    if aborted[0]:
+        firms_done = done_count[0]
+        jobs_done  = total_jobs_live[0]
+        print(
+            f"\n  [ABORTED] Stop signal received.\n"
+            f"  Firms completed : {firms_done}/{total}\n"
+            f"  Firms skipped   : {total - firms_done}\n"
+            f"  Jobs saved      : {jobs_done}\n"
+            f"  All collected jobs have been saved to DB.\n"
+        )
+
+    return all_results, aborted[0]
 
 
 # ── Core async function — called by both CLI and Azure Functions ───────────────
@@ -288,6 +357,7 @@ async def run_scraper(
     roles:        list[str] | None = None,
     on_progress   = None,
     firms_config: str | None = None,
+    stop_check    = None,
 ) -> dict:
     """
     Run the full scrape job.
@@ -404,20 +474,23 @@ async def run_scraper(
 
     # ── Step 2: Run firm-first batch ─────────────────────────────────────────────
 
-    all_results = await run_batch_firm_first(
+    all_results, was_aborted = await run_batch_firm_first(
         sites             = sites,
         roles             = roles,
         concurrency       = concurrency,
         output_file       = output_file,
         role_search_terms = role_search_terms,
         on_progress       = on_progress,
-        storage           = save_storage,   # None in cosmos mode; saves happen post-batch
+        storage           = save_storage,
         save_every        = 5,
+        crawl_storage     = crawl_storage,
+        save_every_jobs   = int(os.getenv("SAVE_EVERY_JOBS", "20")),
+        stop_check        = stop_check,
     )
 
     # ── Step 3: Build per-role summary + Cosmos save ──────────────────────────────
 
-    summary        = {"started_at": started_at, "roles": []}
+    summary        = {"started_at": started_at, "roles": [], "aborted": was_aborted}
     total_jobs_all = 0
 
     summary_lines = [
@@ -457,12 +530,11 @@ async def run_scraper(
         })
         total_jobs_all += total_jobs
 
-        # Save crawl result + update analyses doc (cosmos mode)
+        # Patch the analyses doc now that the full crawl is done
+        # (job saving happened incrementally inside run_batch_firm_first)
         if crawl_storage:
-            jobs      = [_build_crawl_job(r, role) for r in role_results if r.status == "success"]
-            crawl_id  = _generate_crawl_id(role)
-            await crawl_storage.save_crawl_result(crawl_id, role, jobs)
-            doc_id = role_to_doc_id.get(role)
+            crawl_id = _generate_crawl_id(role)
+            doc_id   = role_to_doc_id.get(role)
             if doc_id:
                 await crawl_storage.update_analysis(doc_id, crawl_id)
 
@@ -484,12 +556,16 @@ async def run_scraper(
         f.write("\n".join(summary_lines) + "\n")
         f.write(footer)
 
-    save_loc = "Azure Cosmos DB (analyses → agent_job_results)" if crawl_storage else "results.json (local)"
+    save_loc   = "Azure Cosmos DB (analyses → agent_job_results)" if crawl_storage else "results.json (local)"
+    run_label  = "ABORTED" if was_aborted else "Done"
+    firms_done = len({r.firm_name for r in all_results})
     print(f"\n{'-'*70}")
-    print(f"  Done  |  {len(roles)} roles  |  {total_jobs_all} total jobs  |  finished {finished_at}")
+    print(f"  {run_label}  |  {len(roles)} roles  |  {firms_done}/{len(sites)} firms  |  {total_jobs_all} jobs  |  {finished_at}")
     print(f"  TXT  -> {output_file}")
     print(f"  DB   -> {save_loc}")
     print(f"{'-'*70}\n")
+    summary["firms_done"]  = firms_done
+    summary["firms_total"] = len(sites)
 
     if crawl_storage:
         await crawl_storage.close()
