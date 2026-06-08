@@ -1,4 +1,4 @@
-"""Strategy for direct/custom career pages — navigates from the firm's main careers page."""
+"""Strategy for direct/custom career pages -- navigates from the firm's main careers page."""
 
 from typing import List
 from .base import BaseStrategy
@@ -17,20 +17,20 @@ class DirectStrategy(BaseStrategy):
 You are on a law firm careers page at {url}.
 Your goal is to find ALL jobs matching "{role}" and extract salary, experience, location, and URL for EVERY match.
 
-STEP 1 — FIND THE STAFF CAREERS SECTION
+STEP 1 -- FIND THE STAFF CAREERS SECTION
 - Look for links labelled: "Professional Staff", "Business Professionals", "Business Services",
   "Staff Careers", "Administrative Staff", or similar.
 - Do NOT click "Attorneys", "Lawyers", "Associates", "Lateral Partners", or any attorney section.
 - If there is a search box, type "{role}" and search.
 - If the page has department/category filters, select a staff or business category.
 
-STEP 2 — NAVIGATE TO JOB LISTINGS
+STEP 2 -- NAVIGATE TO JOB LISTINGS
 - Follow links toward individual job listings.
 - If the site redirects to an external ATS (Workday, iCIMS, Greenhouse, etc.),
-  continue navigating there — use the search field to find "{role}".
+  continue navigating there -- use the search field to find "{role}".
 - Look for job cards, list items, or table rows showing job titles.
 
-STEP 3 — COLLECT ALL MATCHING JOBS
+STEP 3 -- COLLECT ALL MATCHING JOBS
 - Identify ALL listings whose title matches or is related to "{role}".
 - For each matching job:
   - Click the job title to open the detail page.
@@ -39,7 +39,7 @@ STEP 3 — COLLECT ALL MATCHING JOBS
   - Continue to the next matching job.
 - Collect up to 10 matching jobs.
 
-STEP 4 — EXTRACT FROM EACH JOB DETAIL
+STEP 4 -- EXTRACT FROM EACH JOB DETAIL
 For each job, extract:
 - Job title: main heading
 - Salary: labelled "Pay Range", "Compensation", "Salary Range", or inline "$X,XXX - $Y,XXX". Use "Not listed" if absent.

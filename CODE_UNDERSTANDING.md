@@ -1,15 +1,15 @@
-# HR Salary Scraper — Complete Code Understanding
+# HR Salary Scraper -- Complete Code Understanding
 
 ## Table of Contents
 1. [What This Project Does](#1-what-this-project-does)
 2. [Project Structure](#2-project-structure)
-3. [Data Flow — End to End](#3-data-flow--end-to-end)
-4. [Models — app/models.py](#4-models--appmodelspy)
-5. [Strategies — app/strategies/](#5-strategies--appstrategies)
-6. [Scraper Engine — app/scraper.py](#6-scraper-engine--appscraperpy)
-7. [Main Orchestrator — main.py](#7-main-orchestrator--mainpy)
-8. [Storage Layer — app/storage.py](#8-storage-layer--appstoragepy)
-9. [Azure Functions Entry Point — function_app.py](#9-azure-functions-entry-point--function_apppy)
+3. [Data Flow -- End to End](#3-data-flow--end-to-end)
+4. [Models -- app/models.py](#4-models--appmodelspy)
+5. [Strategies -- app/strategies/](#5-strategies--appstrategies)
+6. [Scraper Engine -- app/scraper.py](#6-scraper-engine--appscraperpy)
+7. [Main Orchestrator -- main.py](#7-main-orchestrator--mainpy)
+8. [Storage Layer -- app/storage.py](#8-storage-layer--appstoragepy)
+9. [Azure Functions Entry Point -- function_app.py](#9-azure-functions-entry-point--function_apppy)
 10. [How the Agent Is Built](#10-how-the-agent-is-built)
 11. [Function Call Map](#11-function-call-map)
 12. [Config Files](#12-config-files)
@@ -20,7 +20,7 @@
 
 This scraper visits law firm career portals, searches for job roles (paralegal, litigation, business development), extracts salary/experience/location from each job posting using an AI agent (Browser-Use + Azure OpenAI GPT), and saves the results to Azure Cosmos DB.
 
-**Key idea:** Instead of writing CSS selectors for each site, we give the AI a plain-English task and let it navigate the website like a human would — clicking buttons, filling search boxes, reading page content.
+**Key idea:** Instead of writing CSS selectors for each site, we give the AI a plain-English task and let it navigate the website like a human would -- clicking buttons, filling search boxes, reading page content.
 
 ---
 
@@ -28,77 +28,77 @@ This scraper visits law firm career portals, searches for job roles (paralegal, 
 
 ```
 hr-salary-scraper/
-│
-├── function_app.py          ← Azure Functions entry point (HTTP + Timer triggers)
-├── main.py                  ← Core logic + CLI entry point
-│
-├── app/
-│   ├── models.py            ← Pydantic data models (SiteConfig, JobExtraction, ScrapeResult)
-│   ├── scraper.py           ← Browser-Use agent setup + execution
-│   ├── storage.py           ← Cosmos DB + local JSON storage
-│   └── strategies/
-│       ├── base.py          ← Abstract base class for all strategies
-│       ├── videsktop.py     ← Strategy for viDesktop/VI Recruit portals
-│       └── __init__.py      ← Strategy registry (get_strategy function)
-│
-├── config/
-│   ├── all_firms.json       ← 56 law firm definitions (name, URL, strategy)
-│   └── roles.json           ← Roles to scrape ["paralegal", "litigation", ...]
-│
-├── Dockerfile               ← Docker image with Azure Functions + Playwright
-├── host.json                ← Azure Functions config (2-hour timeout)
-└── local.settings.json      ← Local env vars (credentials, not committed)
+|
++-- function_app.py          <- Azure Functions entry point (HTTP + Timer triggers)
++-- main.py                  <- Core logic + CLI entry point
+|
++-- app/
+|   +-- models.py            <- Pydantic data models (SiteConfig, JobExtraction, ScrapeResult)
+|   +-- scraper.py           <- Browser-Use agent setup + execution
+|   +-- storage.py           <- Cosmos DB + local JSON storage
+|   +-- strategies/
+|       +-- base.py          <- Abstract base class for all strategies
+|       +-- videsktop.py     <- Strategy for viDesktop/VI Recruit portals
+|       +-- __init__.py      <- Strategy registry (get_strategy function)
+|
++-- config/
+|   +-- all_firms.json       <- 56 law firm definitions (name, URL, strategy)
+|   +-- roles.json           <- Roles to scrape ["paralegal", "litigation", ...]
+|
++-- Dockerfile               <- Docker image with Azure Functions + Playwright
++-- host.json                <- Azure Functions config (2-hour timeout)
++-- local.settings.json      <- Local env vars (credentials, not committed)
 ```
 
 ---
 
-## 3. Data Flow — End to End
+## 3. Data Flow -- End to End
 
 ```
 Azure Timer (12 AM IST daily)
-        │
-        ▼
-function_app.py → scheduled_scrape()
-        │
-        ▼
-main.py → run_scraper()
-        │
-        ├── load_roles()         reads config/roles.json   → ["paralegal", "litigation", ...]
-        ├── load_sites()         reads config/all_firms.json → 56 SiteConfig objects
-        ├── storage.connect()    connects to Cosmos DB
-        │
-        └── for each role:
-               │
-               ├── generate_search_terms(role)   LLM generates 4 alternative titles
-               │
-               └── run_batch(sites, role, ...)
-                       │
-                       └── for each firm (up to 5 parallel):
-                               │
-                               ▼
-                          scraper.py → scrape_site(site, role, search_terms)
-                               │
-                               ├── BrowserProfile (unique temp dir, --no-sandbox)
-                               ├── Agent(task, llm, browser_profile, ...)
-                               ├── agent.run(max_steps=60)
-                               │       ↕ AI navigates the website
-                               └── parse_multi_extraction(result)
-                                       │
-                                       ▼
+        |
+        v
+function_app.py -> scheduled_scrape()
+        |
+        v
+main.py -> run_scraper()
+        |
+        +-- load_roles()         reads config/roles.json   -> ["paralegal", "litigation", ...]
+        +-- load_sites()         reads config/all_firms.json -> 56 SiteConfig objects
+        +-- storage.connect()    connects to Cosmos DB
+        |
+        +-- for each role:
+               |
+               +-- generate_search_terms(role)   LLM generates 4 alternative titles
+               |
+               +-- run_batch(sites, role, ...)
+                       |
+                       +-- for each firm (up to 5 parallel):
+                               |
+                               v
+                          scraper.py -> scrape_site(site, role, search_terms)
+                               |
+                               +-- BrowserProfile (unique temp dir, --no-sandbox)
+                               +-- Agent(task, llm, browser_profile, ...)
+                               +-- agent.run(max_steps=60)
+                               |       ^v AI navigates the website
+                               +-- parse_multi_extraction(result)
+                                       |
+                                       v
                                   list[ScrapeResult]
-                                       │
-                                       ▼
+                                       |
+                                       v
                                storage.save_batch()
-                                       │
-                                       ▼
+                                       |
+                                       v
                                Cosmos DB: agent_job_results
 ```
 
 ---
 
-## 4. Models — app/models.py
+## 4. Models -- app/models.py
 
-These are Pydantic models — they define the shape/type of data throughout the project.
+These are Pydantic models -- they define the shape/type of data throughout the project.
 
 ### `ATSStrategy` (Enum)
 ```python
@@ -120,7 +120,7 @@ class SiteConfig(BaseModel):
     strategy:         ATSStrategy   # ATSStrategy.VIDESKTOP
     navigation_hints: Optional[str] # Extra instructions for this specific firm
 ```
-**Where used:** Loaded from `config/all_firms.json` in `main.py → load_sites()`.
+**Where used:** Loaded from `config/all_firms.json` in `main.py -> load_sites()`.
 Passed to `scrape_site(site, role)` in `scraper.py`.
 
 ---
@@ -128,11 +128,11 @@ Passed to `scrape_site(site, role)` in `scraper.py`.
 ### `JobExtraction`
 ```python
 class JobExtraction(BaseModel):
-    role_title:       str            # "Paralegal – Litigation"
+    role_title:       str            # "Paralegal - Litigation"
     description:      Optional[str]  # "2-4 sentence summary..."
     salary_min:       Optional[str]  # "$75,000"
     salary_max:       Optional[str]  # "$90,000"
-    salary_raw:       Optional[str]  # "The salary range is $75,000–$90,000 annually."
+    salary_raw:       Optional[str]  # "The salary range is $75,000-$90,000 annually."
     is_hourly:        Optional[bool] # True only if page says "per hour" / "/hr"
     experience_years: Optional[str]  # "3-5 years"
     experience_raw:   Optional[str]  # Full raw experience text
@@ -162,7 +162,7 @@ class ScrapeResult(BaseModel):
 
 ---
 
-## 5. Strategies — app/strategies/
+## 5. Strategies -- app/strategies/
 
 ### Why strategies exist
 Different law firms use different Applicant Tracking Systems (ATS).
@@ -174,18 +174,18 @@ Each strategy holds the AI prompt tailored for that specific portal type.
 ### `BaseStrategy` (base.py)
 ```python
 class BaseStrategy(ABC):
-    def get_initial_actions(self, role, url) → List[dict]: ...  # abstract
-    def get_extraction_task(self, role, url) → str:         ...  # abstract
-    def get_navigation_task(self, role, url, hints) → str:      # concrete
+    def get_initial_actions(self, role, url) -> List[dict]: ...  # abstract
+    def get_extraction_task(self, role, url) -> str:         ...  # abstract
+    def get_navigation_task(self, role, url, hints) -> str:      # concrete
 ```
-- `get_initial_actions` — Playwright actions to run BEFORE the agent starts (e.g. go_to_url).
-  These run deterministically — no AI, no tokens used.
-- `get_extraction_task` — The main AI prompt. Tells the agent exactly how to navigate
+- `get_initial_actions` -- Playwright actions to run BEFORE the agent starts (e.g. go_to_url).
+  These run deterministically -- no AI, no tokens used.
+- `get_extraction_task` -- The main AI prompt. Tells the agent exactly how to navigate
   this type of portal and what JSON to return.
-- `get_navigation_task` — Combines `get_extraction_task` + hints + universal hard rules
+- `get_navigation_task` -- Combines `get_extraction_task` + hints + universal hard rules
   (no extra tabs, wrong-page recovery, etc.). This is the final prompt passed to the agent.
 
-**Called from:** `scraper.py → scrape_site()`:
+**Called from:** `scraper.py -> scrape_site()`:
 ```python
 strategy = get_strategy(site.strategy)       # returns ViDesktopStrategy instance
 task = strategy.get_navigation_task(role, site.careers_url, effective_hints)
@@ -194,7 +194,7 @@ task = strategy.get_navigation_task(role, site.careers_url, effective_hints)
 ---
 
 ### `ViDesktopStrategy` (videsktop.py)
-This is the most detailed strategy — 400+ lines of prompt instructions covering:
+This is the most detailed strategy -- 400+ lines of prompt instructions covering:
 
 | Section | What it tells the AI |
 |---------|---------------------|
@@ -206,26 +206,26 @@ This is the most detailed strategy — 400+ lines of prompt instructions coverin
 | F | Phase 3: Search ALL provided terms (paralegal, Legal Assistant, Legal Support...) |
 | G | Phase 4: Scan all matching grid rows, build candidate list |
 | H | Phase 5: Open each job, extract the job URL, extract data |
-| I | Extraction schema — exactly what fields to extract and how |
-| J | Fallback — return `{"jobs": []}` if nothing found |
+| I | Extraction schema -- exactly what fields to extract and how |
+| J | Fallback -- return `{"jobs": []}` if nothing found |
 
-**Key technical detail in the prompt — viDesktop postback problem:**
-viDesktop uses ASP.NET WebForms. When you click a job row, `__doPostBack()` fires and replaces the page content IN PLACE. The URL stays at `RecDefault.aspx` forever. This means you CANNOT use `page.url` as the job URL — you must extract `RecApplicantEmail.aspx?Tag=...` from the HTML. The prompt explicitly warns the AI about this.
+**Key technical detail in the prompt -- viDesktop postback problem:**
+viDesktop uses ASP.NET WebForms. When you click a job row, `__doPostBack()` fires and replaces the page content IN PLACE. The URL stays at `RecDefault.aspx` forever. This means you CANNOT use `page.url` as the job URL -- you must extract `RecApplicantEmail.aspx?Tag=...` from the HTML. The prompt explicitly warns the AI about this.
 
 ---
 
-### Strategy Registry — `__init__.py`
+### Strategy Registry -- `__init__.py`
 ```python
 def get_strategy(strategy: ATSStrategy) -> BaseStrategy:
     if strategy == ATSStrategy.VIDESKTOP:
         return ViDesktopStrategy()
     ...
 ```
-**Called from:** `scraper.py → scrape_site()` to get the right strategy for each firm.
+**Called from:** `scraper.py -> scrape_site()` to get the right strategy for each firm.
 
 ---
 
-## 6. Scraper Engine — app/scraper.py
+## 6. Scraper Engine -- app/scraper.py
 
 This is the most complex file. It sets up and runs the Browser-Use AI agent.
 
@@ -242,10 +242,10 @@ def get_llm():
             ...
         )
 ```
-Returns a LangChain LLM object — either Azure OpenAI or plain OpenAI.
+Returns a LangChain LLM object -- either Azure OpenAI or plain OpenAI.
 **Called from:**
-- `scrape_site()` — one LLM instance per browser agent
-- `generate_search_terms()` — one LLM call to get alternative job titles
+- `scrape_site()` -- one LLM instance per browser agent
+- `generate_search_terms()` -- one LLM call to get alternative job titles
 
 ---
 
@@ -260,14 +260,14 @@ Returns: `["paralegal", "Paralegal Specialist", "Legal Assistant", "Legal Suppor
 
 **Why needed:** Different firms title the same role differently. Searching only "paralegal" misses firms that post it as "Legal Assistant". By searching all alternatives, we find more jobs.
 
-**Called from:** `main.py → run_scraper()` once per role, before running the batch.
+**Called from:** `main.py -> run_scraper()` once per role, before running the batch.
 
 ---
 
 ### `_expand_search_terms(role)` (static fallback)
 If the LLM call fails, this function generates terms with hard-coded rules:
-- "paralegal" → adds "Legal Assistant", "Legal Support", "Litigation Support"
-- "attorney" → adds "Counsel", "Lawyer", "Associate"
+- "paralegal" -> adds "Legal Assistant", "Legal Support", "Litigation Support"
+- "attorney" -> adds "Counsel", "Lawyer", "Associate"
 - etc.
 
 **Called from:** `generate_search_terms()` as fallback.
@@ -318,7 +318,7 @@ The last real URL the agent visited is a better fallback than the starting `care
 
 ---
 
-### `scrape_site(site, role, search_terms)` — the core function
+### `scrape_site(site, role, search_terms)` -- the core function
 
 This is where the Browser-Use agent is built and run.
 
@@ -326,10 +326,10 @@ This is where the Browser-Use agent is built and run.
 async def scrape_site(site: SiteConfig, role: str, search_terms: list) -> list[ScrapeResult]:
 ```
 
-**Step 1 — Build the search terms hint:**
+**Step 1 -- Build the search terms hint:**
 ```python
 terms_hint = (
-    "SEARCH ALL TERMS — MANDATORY:\n"
+    "SEARCH ALL TERMS -- MANDATORY:\n"
     "Terms to search:\n"
     "  1. paralegal\n"
     "  2. Legal Assistant\n"
@@ -339,15 +339,15 @@ terms_hint = (
 effective_hints = (site.navigation_hints or "") + terms_hint
 task = strategy.get_navigation_task(role, site.careers_url, effective_hints)
 ```
-The final `task` string is the complete AI prompt — strategy instructions + firm-specific hints + search terms list.
+The final `task` string is the complete AI prompt -- strategy instructions + firm-specific hints + search terms list.
 
-**Step 2 — Create a unique Chrome profile directory:**
+**Step 2 -- Create a unique Chrome profile directory:**
 ```python
 unique_profile_dir = os.path.join(tempfile.gettempdir(), f"bu_{uuid.uuid4().hex[:12]}")
 ```
 **Why:** When 5 browsers run concurrently, they all try to use the same Chrome profile directory by default. Chrome uses a `SingletonLock` file to prevent two instances from sharing a profile. This would crash all but the first browser. By giving each a unique temp directory, they never conflict.
 
-**Step 3 — Create BrowserProfile:**
+**Step 3 -- Create BrowserProfile:**
 ```python
 profile = BrowserProfile(
     user_data_dir=unique_profile_dir,
@@ -357,31 +357,31 @@ profile = BrowserProfile(
     viewport={"width": 1280, "height": 900},
 )
 ```
-- `headless=True` — no visible browser window (required in production)
-- `disable_security=True` — allows cross-origin requests (career portals often use iframes)
-- `--no-sandbox` — required inside Docker containers (Linux kernel sandbox not available)
-- `viewport` — page width/height; affects what elements the AI sees
+- `headless=True` -- no visible browser window (required in production)
+- `disable_security=True` -- allows cross-origin requests (career portals often use iframes)
+- `--no-sandbox` -- required inside Docker containers (Linux kernel sandbox not available)
+- `viewport` -- page width/height; affects what elements the AI sees
 
-**Step 4 — Set agent parameters:**
+**Step 4 -- Set agent parameters:**
 ```python
 is_videsktop = (site.strategy.value == "videsktop")
 max_steps        = 60 if is_videsktop else 20
 actions_per_step = 1  if is_videsktop else 3
 ```
-- `max_steps=60` — viDesktop needs more steps: navigate (10) + search all terms (15) + open each job (35)
-- `actions_per_step=1` — viDesktop uses ASP.NET postbacks. If the AI does 3 actions in one step,
+- `max_steps=60` -- viDesktop needs more steps: navigate (10) + search all terms (15) + open each job (35)
+- `actions_per_step=1` -- viDesktop uses ASP.NET postbacks. If the AI does 3 actions in one step,
   action 1 fires a postback, the page reloads, but actions 2 and 3 still reference old element indices
-  from the pre-reload page → wrong clicks. Forcing 1 action per step makes the AI re-read the page
+  from the pre-reload page -> wrong clicks. Forcing 1 action per step makes the AI re-read the page
   after every action.
 
-**Step 5 — Set initial_actions:**
+**Step 5 -- Set initial_actions:**
 ```python
 initial_actions = [{"go_to_url": {"url": site.careers_url}}]
 ```
 Before the AI takes over, Playwright navigates directly to the careers URL.
 **Why:** Without this, the agent starts at `about:blank` and wastes a step (or gives up immediately).
 
-**Step 6 — Build the Agent:**
+**Step 6 -- Build the Agent:**
 ```python
 agent = Agent(
     task=task,                         # The full AI prompt
@@ -397,7 +397,7 @@ agent = Agent(
 )
 ```
 
-**Step 7 — Run the agent:**
+**Step 7 -- Run the agent:**
 ```python
 result = await asyncio.wait_for(
     agent.run(max_steps=60),
@@ -411,20 +411,20 @@ result = await asyncio.wait_for(
 4. Browser executes the action
 5. Repeat until `done()` is called or max_steps reached
 
-**Step 8 — Parse the agent's output:**
+**Step 8 -- Parse the agent's output:**
 ```python
 final = result.final_result()   # The text the agent returned at done()
 
 if is_videsktop:
     extractions = parse_multi_extraction(final, role, last_url[0])
 ```
-The agent returns raw text — usually a JSON string like:
+The agent returns raw text -- usually a JSON string like:
 ```json
 {"jobs": [{"role_title": "Paralegal", "salary_min": "$75,000", ...}]}
 ```
 `parse_multi_extraction()` extracts all job objects from this text.
 
-**Step 9 — Build ScrapeResults:**
+**Step 9 -- Build ScrapeResults:**
 ```python
 for extraction in extractions:
     site_results.append(ScrapeResult(
@@ -438,7 +438,7 @@ for extraction in extractions:
 return site_results
 ```
 
-**Step 10 — Cleanup:**
+**Step 10 -- Cleanup:**
 ```python
 finally:
     shutil.rmtree(unique_profile_dir, ignore_errors=True)
@@ -458,14 +458,14 @@ sometimes it embeds JSON in prose text, sometimes it returns a single job instea
 Parse order:
 1. Direct `json.loads()` on the raw string
 2. Extract from markdown code block
-3. Bracket-matching — find `{...}` objects embedded in prose
+3. Bracket-matching -- find `{...}` objects embedded in prose
 4. Try as single-job format (fallback to `parse_extraction`)
 
 Returns: `list[JobExtraction]`
 
 ---
 
-## 7. Main Orchestrator — main.py
+## 7. Main Orchestrator -- main.py
 
 This file ties everything together. It's called both from the CLI and from Azure Functions.
 
@@ -514,7 +514,7 @@ async def run_batch(sites, role, concurrency=5, ...) -> list[ScrapeResult]:
 ```
 **Why asyncio.Semaphore:** Creates all tasks at once but limits how many run simultaneously.
 With 56 firms and concurrency=5, at most 5 Chromium browsers are open at any moment.
-Without this limit: 56 browsers would open simultaneously → system runs out of RAM.
+Without this limit: 56 browsers would open simultaneously -> system runs out of RAM.
 
 ---
 
@@ -522,7 +522,7 @@ Without this limit: 56 browsers would open simultaneously → system runs out of
 ```python
 async def run_scraper(...) -> dict:
 ```
-The main entry point — called by both CLI and Azure Functions.
+The main entry point -- called by both CLI and Azure Functions.
 
 **Flow:**
 ```
@@ -532,22 +532,22 @@ The main entry point — called by both CLI and Azure Functions.
 4. Connect to storage (Cosmos DB or local JSON)
 5. Print run header
 6. For each role:
-   a. generate_search_terms(role)  ← LLM generates 4 alternatives
-   b. run_batch(sites, role, ...)  ← scrape all 56 firms concurrently
-   c. storage.save_batch(results)  ← save to Cosmos DB
+   a. generate_search_terms(role)  <- LLM generates 4 alternatives
+   b. run_batch(sites, role, ...)  <- scrape all 56 firms concurrently
+   c. storage.save_batch(results)  <- save to Cosmos DB
    d. Print role summary
 7. Print final summary
 8. Return summary dict
 ```
 
 **Why `run_scraper()` is a separate function from `main()`:**
-`main()` reads from `argparse` + `.env`. But Azure Functions can't use argparse —
+`main()` reads from `argparse` + `.env`. But Azure Functions can't use argparse --
 it calls `run_scraper()` directly with explicit parameters.
 Both paths share the same core logic.
 
 ---
 
-### `main()` — CLI entry point
+### `main()` -- CLI entry point
 ```python
 async def main():
     parser = argparse.ArgumentParser()
@@ -564,7 +564,7 @@ Used when running locally: `python main.py --filter "Jones Day"`.
 
 ---
 
-## 8. Storage Layer — app/storage.py
+## 8. Storage Layer -- app/storage.py
 
 ---
 
@@ -573,7 +573,7 @@ Used when running locally: `python main.py --filter "Jones Day"`.
 def _build_document(result: ScrapeResult, run_id: str) -> dict:
     doc = {
         "id":       str(uuid.uuid4()),   # unique document ID
-        "role":     result.role_searched, # partition key — all paralegal jobs together
+        "role":     result.role_searched, # partition key -- all paralegal jobs together
         "run_id":   run_id,              # same UUID for all docs in one execution
         "scraped_at": datetime.now(timezone.utc).isoformat(),
         "firm_name": result.firm_name,
@@ -586,7 +586,7 @@ def _build_document(result: ScrapeResult, run_id: str) -> dict:
         ...
     return doc
 ```
-Flattens the nested `ScrapeResult → JobExtraction` structure into a flat dict for Cosmos DB.
+Flattens the nested `ScrapeResult -> JobExtraction` structure into a flat dict for Cosmos DB.
 **Why flat:** Cosmos DB queries on nested fields are awkward. Flat documents are easier to query.
 
 ---
@@ -624,12 +624,12 @@ class CosmosStorage:
 ```
 
 **Why partition key `/role`:**
-Cosmos DB splits data across physical partitions. All documents with the same `role` value go to the same partition. This makes queries like `SELECT * FROM c WHERE c.role = "paralegal"` very fast — Cosmos reads only one partition instead of scanning everything.
+Cosmos DB splits data across physical partitions. All documents with the same `role` value go to the same partition. This makes queries like `SELECT * FROM c WHERE c.role = "paralegal"` very fast -- Cosmos reads only one partition instead of scanning everything.
 
 **Why `upsert_item` not `create_item`:**
 If the same job is scraped twice (e.g. you trigger the scraper manually then it also runs on schedule), upsert updates the existing document instead of throwing a duplicate error.
 
-**COSMOS_KEY parsing — why needed:**
+**COSMOS_KEY parsing -- why needed:**
 The connection string looks like:
 `AccountEndpoint=https://hrsalarydb.documents.azure.com:443/;AccountKey=abc123==;`
 The SDK needs only the bare key (`abc123==`), not the full connection string.
@@ -643,11 +643,11 @@ Used when `STORAGE=local` in env vars, or when Cosmos DB connection fails.
 
 ---
 
-## 9. Azure Functions Entry Point — function_app.py
+## 9. Azure Functions Entry Point -- function_app.py
 
 ---
 
-### `_run_state` — in-memory run tracker
+### `_run_state` -- in-memory run tracker
 ```python
 _run_state = {
     "status":     "idle",    # idle | running | completed | failed
@@ -663,7 +663,7 @@ because you have Cosmos DB as the persistent record.
 
 ---
 
-### Timer Trigger — `scheduled_scrape`
+### Timer Trigger -- `scheduled_scrape`
 ```python
 @app.timer_trigger(
     schedule="0 30 18 * * *",    # 6-part CRON: seconds minutes hours day month weekday
@@ -679,7 +679,7 @@ Azure Functions adds a seconds field as the first field.
 
 ---
 
-### HTTP Trigger — `http_trigger`
+### HTTP Trigger -- `http_trigger`
 ```python
 @app.route(route="trigger", methods=["GET","POST"], auth_level=func.AuthLevel.ANONYMOUS)
 async def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
@@ -694,7 +694,7 @@ async def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
 
     _run_state["status"] = "running"
 
-    # Start scrape in background — does NOT block HTTP response
+    # Start scrape in background -- does NOT block HTTP response
     _background_task = asyncio.create_task(_execute_scrape(...))
 
     return 202 Accepted   # return immediately
@@ -710,7 +710,7 @@ The endpoint is not sensitive (it only starts a scrape) and access is controlled
 
 ---
 
-### Status Endpoint — `status_trigger`
+### Status Endpoint -- `status_trigger`
 ```python
 @app.route(route="status", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 async def status_trigger(req: func.HttpRequest) -> func.HttpResponse:
@@ -739,7 +739,7 @@ It imports `run_scraper` from `main.py` and updates `_run_state` when done.
 
 ## 10. How the Agent Is Built
 
-This is the most important section — understanding what parameters the Browser-Use agent receives and why.
+This is the most important section -- understanding what parameters the Browser-Use agent receives and why.
 
 ```python
 agent = Agent(
@@ -759,7 +759,7 @@ agent = Agent(
 | Parameter | What it is | Why we set it this way |
 |-----------|-----------|----------------------|
 | `task` | The full AI prompt (strategy instructions + search terms) | Tells the AI exactly what to do on this specific portal |
-| `llm` | Azure OpenAI GPT instance | The brain — decides every action |
+| `llm` | Azure OpenAI GPT instance | The brain -- decides every action |
 | `browser_profile` | Chrome settings (headless, temp dir, --no-sandbox) | Each firm gets an isolated Chrome instance; --no-sandbox for Docker |
 | `use_vision=False` | Don't send screenshots to the AI | Saves tokens; HTML element listing is sufficient for these portals |
 | `max_actions_per_step=1` | How many browser actions per LLM call | viDesktop: 1 (postback reloads page); others: 3 (faster) |
@@ -787,54 +787,54 @@ Without `href` in `include_attributes`, the AI would only see `[23] <a>Apply Now
 
 ```
 function_app.py
-│
-├── scheduled_scrape()  ──────────────────────────────────────────────┐
-├── http_trigger()  ──→  asyncio.create_task(_execute_scrape())  ─────┤
-└── status_trigger()                                                   │
-                                                                       ▼
+|
++-- scheduled_scrape()  ----------------------------------------------+
++-- http_trigger()  --->  asyncio.create_task(_execute_scrape())  -----+
++-- status_trigger()                                                   |
+                                                                       v
                                                     _execute_scrape()
-                                                           │
-                                                           ▼
-main.py ← from main import run_scraper
-│
-└── run_scraper()
-        │
-        ├── load_roles()                    reads config/roles.json
-        ├── load_sites()                    reads config/all_firms.json → list[SiteConfig]
-        ├── CosmosStorage().connect()       app/storage.py
-        │
-        └── for each role:
-                │
-                ├── generate_search_terms(role)          app/scraper.py
-                │       └── get_llm().ainvoke(prompt)
-                │
-                └── run_batch(sites, role, ...)
-                        │
-                        └── asyncio.gather (concurrency=5)
-                                │
-                                └── scrape_site(site, role, terms)    app/scraper.py
-                                        │
-                                        ├── get_strategy(site.strategy) app/strategies/__init__.py
-                                        │       └── ViDesktopStrategy()
-                                        │
-                                        ├── strategy.get_navigation_task(role, url, hints)
-                                        │       └── get_extraction_task() + hints + hard rules
-                                        │
-                                        ├── BrowserProfile(unique_dir, headless, --no-sandbox)
-                                        ├── get_llm()
-                                        │
-                                        ├── Agent(task, llm, profile, ...)
-                                        ├── agent.run(max_steps=60)
-                                        │       ↕ AI navigates, extracts
-                                        │
-                                        ├── parse_multi_extraction(result)
-                                        │       └── list[JobExtraction]
-                                        │
-                                        └── list[ScrapeResult]
-                                                │
-                                                ▼
+                                                           |
+                                                           v
+main.py <- from main import run_scraper
+|
++-- run_scraper()
+        |
+        +-- load_roles()                    reads config/roles.json
+        +-- load_sites()                    reads config/all_firms.json -> list[SiteConfig]
+        +-- CosmosStorage().connect()       app/storage.py
+        |
+        +-- for each role:
+                |
+                +-- generate_search_terms(role)          app/scraper.py
+                |       +-- get_llm().ainvoke(prompt)
+                |
+                +-- run_batch(sites, role, ...)
+                        |
+                        +-- asyncio.gather (concurrency=5)
+                                |
+                                +-- scrape_site(site, role, terms)    app/scraper.py
+                                        |
+                                        +-- get_strategy(site.strategy) app/strategies/__init__.py
+                                        |       +-- ViDesktopStrategy()
+                                        |
+                                        +-- strategy.get_navigation_task(role, url, hints)
+                                        |       +-- get_extraction_task() + hints + hard rules
+                                        |
+                                        +-- BrowserProfile(unique_dir, headless, --no-sandbox)
+                                        +-- get_llm()
+                                        |
+                                        +-- Agent(task, llm, profile, ...)
+                                        +-- agent.run(max_steps=60)
+                                        |       ^v AI navigates, extracts
+                                        |
+                                        +-- parse_multi_extraction(result)
+                                        |       +-- list[JobExtraction]
+                                        |
+                                        +-- list[ScrapeResult]
+                                                |
+                                                v
                                     storage.save_batch()        app/storage.py
-                                        └── CosmosClient.upsert_item(doc)
+                                        +-- CosmosClient.upsert_item(doc)
 ```
 
 ---
@@ -862,7 +862,7 @@ The three roles scraped in every run. To add more roles, add strings to this arr
 
 ---
 
-## Key Design Decisions — Summary
+## Key Design Decisions -- Summary
 
 | Decision | Why |
 |----------|-----|
@@ -870,8 +870,8 @@ The three roles scraped in every run. To add more roles, add strings to this arr
 | One Chrome profile per firm | Prevents `SingletonLock` crashes when running 5 browsers concurrently |
 | `--no-sandbox` flag | Required inside Docker; Chrome's sandbox needs kernel features not available in containers |
 | `actions_per_step=1` for viDesktop | ASP.NET postbacks reload the page; batching 3 actions causes wrong clicks on stale elements |
-| Cosmos DB partition key `/role` | Groups all paralegal jobs together → fast cross-firm queries per role |
+| Cosmos DB partition key `/role` | Groups all paralegal jobs together -> fast cross-firm queries per role |
 | `asyncio.create_task()` in HTTP trigger | Returns 202 immediately; prevents Azure Functions worker timeout on 60-min scrapes |
 | `run_scraper()` as importable function | Shared by CLI (`main()`) and Azure Functions (`_execute_scrape()`) without code duplication |
 | COSMOS_KEY connection string parsing | Azure Portal gives full connection string; SDK needs only the bare key |
-| `upsert_item` not `create_item` | Idempotent — re-running the scraper doesn't fail with duplicate ID errors |
+| `upsert_item` not `create_item` | Idempotent -- re-running the scraper doesn't fail with duplicate ID errors |

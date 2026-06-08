@@ -1,4 +1,4 @@
-"""Strategy for FLO Recruit career portals — navigates from the firm's main careers page."""
+"""Strategy for FLO Recruit career portals -- navigates from the firm's main careers page."""
 
 from typing import List
 from .base import BaseStrategy
@@ -17,17 +17,17 @@ class FloRecruitStrategy(BaseStrategy):
 You are on a law firm careers page at {url}.
 Your goal is to find ALL jobs matching "{role}" and extract salary, experience, location, and URL for EVERY match.
 
-STEP 1 — FIND THE CAREERS / JOBS SECTION
+STEP 1 -- FIND THE CAREERS / JOBS SECTION
 - Look for a link to "Careers", "Open Positions", "Job Openings", "Staff Openings", or "Join Our Team".
 - Click it. It may redirect to a FLO Recruit portal (URL contains "florecruit.com/v2/app/").
-- All jobs on FLO Recruit portals are Professional Staff roles — no filtering needed.
+- All jobs on FLO Recruit portals are Professional Staff roles -- no filtering needed.
 
-STEP 2 — YOU ARE NOW ON FLO RECRUIT
+STEP 2 -- YOU ARE NOW ON FLO RECRUIT
 - This is a React Single Page Application. Wait for job cards to appear.
 - Scroll through ALL visible job cards to see every available role.
-- There may be no search box — scan all cards by title.
+- There may be no search box -- scan all cards by title.
 
-STEP 3 — COLLECT ALL MATCHING JOBS
+STEP 3 -- COLLECT ALL MATCHING JOBS
 - Identify ALL cards whose title matches or is related to "{role}".
 - For each matching card:
   - Click the card or job title to open the detail page.
@@ -37,10 +37,10 @@ STEP 3 — COLLECT ALL MATCHING JOBS
 - Collect up to 10 matching jobs.
 - If NO exact match exists, pick the closest staff role available.
 
-STEP 4 — EXTRACT FROM EACH JOB DETAIL
+STEP 4 -- EXTRACT FROM EACH JOB DETAIL
 For each job, extract:
 - Job title: main heading at the top
-- Salary: in the description or "Job details" list — look for "$X,XXX" or "$XX/hr". Use "Not listed" if absent.
+- Salary: in the description or "Job details" list -- look for "$X,XXX" or "$XX/hr". Use "Not listed" if absent.
 - Experience: in "Requirements" or "Qualifications"
 - Location: in "Job details" list (usually second item) or near the title
 - Department: tag or category label

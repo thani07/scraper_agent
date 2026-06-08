@@ -32,7 +32,7 @@ Your task:
 1. Scan the page for job listings. They may be grouped by department.
 2. If there is a search/filter option, type "{role}" and filter.
 3. If no search exists, scroll through listings to find "{role}" or a close match.
-4. Look specifically under sections like "Professional Staff", "Business Services", "Operations", "Administration" — NOT under "Attorneys" or "Legal" sections.
+4. Look specifically under sections like "Professional Staff", "Business Services", "Operations", "Administration" -- NOT under "Attorneys" or "Legal" sections.
 5. Click on the matching job to open its detail page.
 6. Extract:
    - Exact job title

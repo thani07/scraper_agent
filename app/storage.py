@@ -1,4 +1,4 @@
-"""Storage layer — saves scrape results to Azure Cosmos DB or local JSON fallback."""
+"""Storage layer -- saves scrape results to Azure Cosmos DB or local JSON fallback."""
 
 import os
 import json
@@ -14,7 +14,7 @@ from app.models import ScrapeResult
 load_dotenv()
 
 
-# ── New-architecture helpers ───────────────────────────────────────────────────
+# -- New-architecture helpers ---------------------------------------------------
 
 def _generate_crawl_id(role: str) -> str:
     """Generate a deterministic crawl ID from role name: crawl_<md5hex>."""
@@ -31,7 +31,7 @@ def _build_crawl_job(result: ScrapeResult, role: str) -> dict:
     """Convert a successful ScrapeResult into a job entry for the crawl doc.
 
     job_role is always the parent role name (lowercase), not the specific
-    similar_role keyword that matched — so all jobs under one crawl doc
+    similar_role keyword that matched -- so all jobs under one crawl doc
     share the same job_role value.
     """
     e = result.extraction
@@ -55,21 +55,21 @@ def _build_document(result: ScrapeResult, run_id: str) -> dict:
     """
     Flatten a ScrapeResult into a single Cosmos DB document.
 
-    Partition key: /role_title — the actual job title fetched from the website
+    Partition key: /role_title -- the actual job title fetched from the website
                                  (e.g. "Litigation Associate", "Paralegal, Real Estate").
                                  For no_results/error records (no extraction), falls back
                                  to the searched_role so the field is never null.
 
     Document shape:
-        id              — unique UUID per document
-        role_title      — partition key — actual job title from the website
-        searched_role   — the role keyword used to find this job (e.g. "paralegal")
-        run_id          — UUID shared by all documents in one run
-        scraped_at      — ISO-8601 UTC timestamp
+        id              -- unique UUID per document
+        role_title      -- partition key -- actual job title from the website
+        searched_role   -- the role keyword used to find this job (e.g. "paralegal")
+        run_id          -- UUID shared by all documents in one run
+        scraped_at      -- ISO-8601 UTC timestamp
         firm_name
         strategy_used
-        status          — success | no_results | error
-        error_message   — only present on error
+        status          -- success | no_results | error
+        error_message   -- only present on error
         scrape_duration_sec
         description
         salary_min
@@ -84,14 +84,14 @@ def _build_document(result: ScrapeResult, run_id: str) -> dict:
     """
     e = result.extraction
 
-    # role_title is the partition key — Cosmos DB requires it to be non-null.
+    # role_title is the partition key -- Cosmos DB requires it to be non-null.
     # For success records: use the actual extracted job title from the website.
     # For no_results / error: no extraction exists, so fall back to the searched role.
     role_title = (e.role_title if e and e.role_title else result.role_searched)
 
     doc: dict = {
         "id":                   str(uuid.uuid4()),
-        "role_title":           role_title,               # partition key — actual job title
+        "role_title":           role_title,               # partition key -- actual job title
         "searched_role":        result.role_searched,     # keyword used to search (e.g. "paralegal")
         "run_id":               run_id,
         "scraped_at":           datetime.now(timezone.utc).isoformat(),
@@ -146,7 +146,7 @@ class CosmosStorage:
         """
         Connect to Cosmos DB and verify the connection with a lightweight read.
 
-        Raises RuntimeError if connection or verification fails — this is intentional.
+        Raises RuntimeError if connection or verification fails -- this is intentional.
         Silent fallback to local disk caused data loss in Azure (ephemeral filesystem).
         The caller (run_scraper) must handle this and abort if STORAGE=cosmos was requested.
         """
@@ -213,7 +213,7 @@ class CosmosStorage:
 
 
 class LocalStorage:
-    """Local JSON fallback — writes results.json in project root."""
+    """Local JSON fallback -- writes results.json in project root."""
 
     def __init__(self, filepath: str = "results.json"):
         self.filepath = filepath
@@ -247,19 +247,19 @@ async def _save_local(doc: dict, filepath: str = "results.json"):
         json.dump(existing, f, indent=2, default=str, ensure_ascii=False)
 
 
-# ── New-architecture Cosmos storage (analyses → agent_job_results) ─────────────
+# -- New-architecture Cosmos storage (analyses -> agent_job_results) -------------
 
 class CrawlStorage:
     """
     New-architecture storage for the analyses-driven crawl flow.
 
-    Source  : 'analyses' container — role docs with similar_roles[]
-    Dest    : 'agent_job_results' container — nested crawl docs per role
+    Source  : 'analyses' container -- role docs with similar_roles[]
+    Dest    : 'agent_job_results' container -- nested crawl docs per role
 
     Each crawl doc shape:
         {
             "id":          "crawl_<md5>",
-            "role":        "role name",          ← partition key
+            "role":        "role name",          <- partition key
             "job_count":   N,
             "jobs":        [...],
             "crawled_at":  "ISO-8601 UTC"
@@ -301,10 +301,10 @@ class CrawlStorage:
         self.client = CosmosClient(endpoint, credential=key)
         db = await self.client.create_database_if_not_exists(id=db_name)
 
-        # analyses — already exists, just get the client (no partition key needed)
+        # analyses -- already exists, just get the client (no partition key needed)
         self.analyses_container = db.get_container_client(analyses_name)
 
-        # agent_job_results — create if not exists, partition key /role
+        # agent_job_results -- create if not exists, partition key /role
         self.results_container = await db.create_container_if_not_exists(
             id=results_name,
             partition_key=PartitionKey(path="/role"),
@@ -377,7 +377,7 @@ class CrawlStorage:
         """Update analyses doc by upserting the modified in-memory copy.
 
         Uses upsert instead of patch so we don't need to know the container's
-        partition key path — Cosmos extracts it automatically from the document body.
+        partition key path -- Cosmos extracts it automatically from the document body.
         """
         doc = self._analyses_cache.get(doc_id) if hasattr(self, "_analyses_cache") else None
         if not doc:

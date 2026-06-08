@@ -1,4 +1,4 @@
-"""Strategy for Workday-powered career sites — navigates from the firm's main careers page."""
+"""Strategy for Workday-powered career sites -- navigates from the firm's main careers page."""
 
 from typing import List
 from .base import BaseStrategy
@@ -17,20 +17,20 @@ class WorkdayStrategy(BaseStrategy):
 You are on a law firm careers page at {url}.
 Your goal is to find ALL jobs matching "{role}" and extract salary, experience, location, and URL for EVERY match.
 
-STEP 1 — FIND THE STAFF CAREERS SECTION
+STEP 1 -- FIND THE STAFF CAREERS SECTION
 - Look for links labelled: "Professional Staff", "Business Professionals", "Business Services",
   "Staff Careers", "Administrative Staff", or similar.
 - Do NOT click "Attorneys", "Lawyers", "Associates", "Lateral Partners", or any attorney section.
 - Click the staff section link. It will redirect to a Workday board (myworkdayjobs.com).
 
-STEP 2 — SEARCH ON WORKDAY
+STEP 2 -- SEARCH ON WORKDAY
 - Workday is a Single Page Application. Wait 3-4 seconds for it to fully load.
 - Find the keyword search box (placeholder: "Search for jobs or keywords").
 - Type "{role}" and press Enter or click Search.
 - Wait for job cards to appear on the left panel.
 - If 0 results, try a shorter keyword (e.g. if "{role}" is "business development", try "business").
 
-STEP 3 — COLLECT ALL MATCHING JOBS
+STEP 3 -- COLLECT ALL MATCHING JOBS
 - Read ALL job cards visible on the left panel.
 - For each card that matches "{role}" (by title or description):
   - Click the card to open the detail panel on the right.
@@ -39,10 +39,10 @@ STEP 3 — COLLECT ALL MATCHING JOBS
 - If there are more pages (pagination), click Next and collect from those too.
 - Collect up to 10 matching jobs.
 
-STEP 4 — EXTRACT FROM EACH JOB DETAIL
+STEP 4 -- EXTRACT FROM EACH JOB DETAIL
 For each job, extract:
 - Job title: heading near the top of the detail panel
-- Salary: labelled "Pay Range" or inline "$X,XXX - $Y,XXX". About 40% do not list salary — use "Not listed".
+- Salary: labelled "Pay Range" or inline "$X,XXX - $Y,XXX". About 40% do not list salary -- use "Not listed".
 - Experience: in "Basic Qualifications" or "Requirements"
 - Location: near the title or "View All N Locations"
 - Department: tag or category label

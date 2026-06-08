@@ -1,4 +1,4 @@
-"""Core scraper engine — runs Browser-Use agent with strategy-driven prompts."""
+"""Core scraper engine -- runs Browser-Use agent with strategy-driven prompts."""
 
 import os
 import time
@@ -22,7 +22,7 @@ load_dotenv()
 
 
 def get_llm():
-    """Initialize LLM — supports both OpenAI direct and Azure OpenAI."""
+    """Initialize LLM -- supports both OpenAI direct and Azure OpenAI."""
     if os.getenv("USE_AZURE", "").lower() == "true":
         return AzureChatOpenAI(
             azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
@@ -113,7 +113,7 @@ def make_step_callback(firm_name: str, last_url_container: list, verbose: bool =
         except Exception:
             pass
 
-        # One-liner per step — always printed
+        # One-liner per step -- always printed
         if action_name or goal:
             action_part = f"{action_name}({action_val})" if action_name else ""
             goal_part   = f'  ->  "{goal}"'              if goal        else ""
@@ -122,7 +122,7 @@ def make_step_callback(firm_name: str, last_url_container: list, verbose: bool =
         if not verbose:
             return
 
-        # Full verbose output — only when VERBOSE_ACTIONS=true
+        # Full verbose output -- only when VERBOSE_ACTIONS=true
         timestamp = datetime.now().strftime("%H:%M:%S")
         try:
             url = browser_state_summary.url
@@ -247,7 +247,7 @@ def _ensure_required_fields(data: dict, fallback_url: str) -> dict:
 def _find_json_arrays(text: str) -> list:
     """
     Extract all top-level JSON arrays from a string using bracket matching.
-    Companion to _find_json_objects — handles bare [...] structures.
+    Companion to _find_json_objects -- handles bare [...] structures.
     """
     results = []
     depth = 0
@@ -286,11 +286,11 @@ def parse_multi_extraction(
     Parse LLM output that contains multiple jobs in {"jobs": [...]} format.
 
     Handles:
-      1. {"jobs": [...]}         — canonical multi-job format
-      2. [{...}, {...}]          — bare array
-      3. Markdown code blocks    — ```json { "jobs": [...] } ```
-      4. Embedded in prose       — bracket-matching extraction
-      5. Single job fallback     — falls through to parse_extraction
+      1. {"jobs": [...]}         -- canonical multi-job format
+      2. [{...}, {...}]          -- bare array
+      3. Markdown code blocks    -- ```json { "jobs": [...] } ```
+      4. Embedded in prose       -- bracket-matching extraction
+      5. Single job fallback     -- falls through to parse_extraction
 
     Returns a list of JobExtraction objects (may be empty).
     """
@@ -335,7 +335,7 @@ def parse_multi_extraction(
         return results
 
     # _try_parse_multi returns (found_multi_structure, jobs_list)
-    # found_multi_structure=True means we saw {"jobs":...} or [...] — stop searching even if empty
+    # found_multi_structure=True means we saw {"jobs":...} or [...] -- stop searching even if empty
     def _try_parse_multi(candidate: str):
         """Try to parse candidate as multi-job JSON.
         Returns (True, jobs) if a multi-job structure was found (jobs may be empty),
@@ -380,7 +380,7 @@ def parse_multi_extraction(
         if found:
             return jobs
 
-    # 5. Single-job fallback — LLM returned old single-job format instead of multi
+    # 5. Single-job fallback -- LLM returned old single-job format instead of multi
     single = parse_extraction(text, fallback_role, fallback_url)
     if single:
         return [single]
@@ -393,22 +393,22 @@ def parse_extraction(raw_result: str, fallback_role: str, fallback_url: str) -> 
     Robustly parse the agent's final output into a JobExtraction model.
 
     Parse order:
-      1. Direct json.loads (+ sanitized variant)         — clean JSON string
-      2. Markdown code-block extraction (+ sanitized)    — ```json { ... } ```
-      3. Bracket-matching finder (+ sanitized per hit)   — JSON embedded in prose
-      4. Last resort                                     — stores raw text for debugging
+      1. Direct json.loads (+ sanitized variant)         -- clean JSON string
+      2. Markdown code-block extraction (+ sanitized)    -- ```json { ... } ```
+      3. Bracket-matching finder (+ sanitized per hit)   -- JSON embedded in prose
+      4. Last resort                                     -- stores raw text for debugging
     """
     if not raw_result:
         return None
 
     text = raw_result.strip()
 
-    # 1. Direct parse — fastest path when the LLM returns clean JSON
+    # 1. Direct parse -- fastest path when the LLM returns clean JSON
     data = _try_parse(text)
     if data:
         return JobExtraction.model_validate(_ensure_required_fields(data, fallback_url))
 
-    # 2. Markdown code block — LLM sometimes wraps output in ```json ... ```
+    # 2. Markdown code block -- LLM sometimes wraps output in ```json ... ```
     import re
     for pattern in [r'```json\s*(\{.+?\})\s*```', r'```\s*(\{.+?\})\s*```']:
         m = re.search(pattern, text, re.DOTALL)
@@ -417,7 +417,7 @@ def parse_extraction(raw_result: str, fallback_role: str, fallback_url: str) -> 
             if data:
                 return JobExtraction.model_validate(_ensure_required_fields(data, fallback_url))
 
-    # 3. Bracket-matching finder — handles JSON embedded inside prose text.
+    # 3. Bracket-matching finder -- handles JSON embedded inside prose text.
     #    Also covers cases where experience_raw / salary_raw contain literal newlines
     #    that make the raw string invalid JSON (_try_parse sanitizes those).
     for candidate in _find_json_objects(text):
@@ -425,7 +425,7 @@ def parse_extraction(raw_result: str, fallback_role: str, fallback_url: str) -> 
         if data:
             return JobExtraction.model_validate(_ensure_required_fields(data, fallback_url))
 
-    # 4. Last resort — parsing truly failed; store raw text in salary_raw for debugging
+    # 4. Last resort -- parsing truly failed; store raw text in salary_raw for debugging
     return JobExtraction(
         role_title=fallback_role,
         salary_raw=text[:500],
@@ -436,21 +436,21 @@ def parse_extraction(raw_result: str, fallback_role: str, fallback_url: str) -> 
 def _expand_search_terms(role: str) -> list[str]:
     """
     Generate an ordered list of search terms for a role, from most specific to broadest.
-    Used when the exact role name returns no results on a job portal — different firms
+    Used when the exact role name returns no results on a job portal -- different firms
     use different naming conventions for the same role.
 
     Examples:
-      "Paralegal"                  → ["Paralegal", "Legal Assistant", "Legal Support"]
-      "Corporate Paralegal"        → ["Corporate Paralegal", "Paralegal", "Corporate", "Legal Assistant"]
-      "Senior Quantitative Analyst"→ ["Senior Quantitative Analyst", "Quantitative Analyst", "Analyst"]
-      "Associate Attorney"         → ["Associate Attorney", "Attorney", "Associate", "Counsel", "Lawyer"]
-      "GCP Manager"                → ["GCP Manager", "Manager", "GCP", "Cloud Manager"]
-      "Data Strategy Manager"      → ["Data Strategy Manager", "Strategy Manager", "Data Manager", "Manager"]
+      "Paralegal"                  -> ["Paralegal", "Legal Assistant", "Legal Support"]
+      "Corporate Paralegal"        -> ["Corporate Paralegal", "Paralegal", "Corporate", "Legal Assistant"]
+      "Senior Quantitative Analyst"-> ["Senior Quantitative Analyst", "Quantitative Analyst", "Analyst"]
+      "Associate Attorney"         -> ["Associate Attorney", "Attorney", "Associate", "Counsel", "Lawyer"]
+      "GCP Manager"                -> ["GCP Manager", "Manager", "GCP", "Cloud Manager"]
+      "Data Strategy Manager"      -> ["Data Strategy Manager", "Strategy Manager", "Data Manager", "Manager"]
     """
     words = role.split()
     terms: list[str] = [role]  # exact match always first
 
-    # Drop leading level/qualifier word: "Senior Corporate Paralegal" → "Corporate Paralegal"
+    # Drop leading level/qualifier word: "Senior Corporate Paralegal" -> "Corporate Paralegal"
     if len(words) >= 3:
         terms.append(" ".join(words[1:]))
 
@@ -458,7 +458,7 @@ def _expand_search_terms(role: str) -> list[str]:
     if len(words) >= 3:
         terms.append(" ".join(words[-2:]))
 
-    # Core title — last word only: "Paralegal", "Attorney", "Manager", "Analyst"
+    # Core title -- last word only: "Paralegal", "Attorney", "Manager", "Analyst"
     if len(words) >= 2:
         terms.append(words[-1])
 
@@ -466,7 +466,7 @@ def _expand_search_terms(role: str) -> list[str]:
     if len(words) >= 2 and len(words[0]) > 3:
         terms.append(words[0])
 
-    # Role-specific synonyms — common alternative names used by law firms and
+    # Role-specific synonyms -- common alternative names used by law firms and
     # professional-services firms for the same underlying role.
     role_lower = role.lower()
     if "business professional" in role_lower or role_lower in ("business professional", "business professionals"):
@@ -531,7 +531,7 @@ async def generate_search_terms(role: str) -> list[str]:
         f"The user wants to search law firm career portals for the role: \"{role}\"\n\n"
         f"Generate exactly 4 alternative job titles or search keywords that US law firms "
         f"commonly use on their career portals to describe this type of position. "
-        f"These must be real terms found on law firm job postings — not generic phrases.\n\n"
+        f"These must be real terms found on law firm job postings -- not generic phrases.\n\n"
         f"Return ONLY a valid JSON array of 4 strings. No explanation, no markdown.\n"
         f"Example for \"litigation\": [\"Litigation Associate\", \"Litigation Counsel\", "
         f"\"Trial Attorney\", \"Dispute Resolution Attorney\"]"
@@ -590,7 +590,7 @@ async def scrape_site(site: SiteConfig, role: str, search_terms: list[str] | Non
                   The agent searches EVERY term and combines all results.
                   If None, falls back to _expand_search_terms(role).
 
-    Returns a list of ScrapeResult objects — one per matching job found.
+    Returns a list of ScrapeResult objects -- one per matching job found.
     videsktop strategy uses multi-job extraction ({"jobs": [...]}) so may return
     multiple results. All other strategies return a single-element list.
     """
@@ -616,7 +616,7 @@ async def scrape_site(site: SiteConfig, role: str, search_terms: list[str] | Non
 
         result = await _scrape_site_once(site, role, search_terms)
 
-        # If success or no_results — done, no retry needed
+        # If success or no_results -- done, no retry needed
         if result and result[0].status != "error":
             return result
 
@@ -626,7 +626,7 @@ async def scrape_site(site: SiteConfig, role: str, search_terms: list[str] | Non
             last_result = result
             continue  # retry
         else:
-            return result  # non-retryable error (e.g. auth, parsing) — return immediately
+            return result  # non-retryable error (e.g. auth, parsing) -- return immediately
 
     return last_result or []
 
@@ -643,7 +643,7 @@ async def _scrape_site_once(site: SiteConfig, role: str, search_terms: list[str]
     # For videsktop: agent must search EVERY term and collect all results.
     # Terms are shown as a numbered list so the agent knows exactly what to search.
     terms_hint = (
-        f"\n\nSEARCH ALL TERMS — MANDATORY:\n"
+        f"\n\nSEARCH ALL TERMS -- MANDATORY:\n"
         f"You must search the following terms ONE BY ONE on this site and collect ALL "
         f"matching jobs from every search. Do NOT stop after the first term that returns results.\n"
         f"Search every term regardless of whether previous terms found jobs.\n"
@@ -699,15 +699,15 @@ async def _scrape_site_once(site: SiteConfig, role: str, search_terms: list[str]
         llm = get_llm()
 
         # videsktop needs many more steps for multi-job extraction:
-        #   navigation (5-10) + search (3) + per-job: navigate + extract + back (3×N)
-        #   15 jobs × 3 steps = 45 + 15 overhead = 60 steps.
+        #   navigation (5-10) + search (3) + per-job: navigate + extract + back (3xN)
+        #   15 jobs x 3 steps = 45 + 15 overhead = 60 steps.
         # Other strategies extract one job and need far fewer steps.
         is_videsktop = (site.strategy.value == "videsktop")
         max_steps = 60 if is_videsktop else 40
 
-        # videsktop uses ASP.NET WebForms — every Search/click triggers a full page reload
+        # videsktop uses ASP.NET WebForms -- every Search/click triggers a full page reload
         # (postback). If the LLM batches 3 actions in one step, action 1 fires the postback,
-        # actions 2 & 3 then reference stale element indices from the pre-reload page →
+        # actions 2 & 3 then reference stale element indices from the pre-reload page ->
         # wrong clicks, null data. Forcing 1 action per step ensures the LLM sees the
         # refreshed element listing before deciding its next action.
         actions_per_step = 1 if is_videsktop else 3
@@ -743,7 +743,7 @@ async def _scrape_site_once(site: SiteConfig, role: str, search_terms: list[str]
             save_conversation_path=convo_path,
             include_attributes=include_attrs,
             initial_actions=initial_actions,
-            # Always register the callback — even when not verbose — so last_url is tracked.
+            # Always register the callback -- even when not verbose -- so last_url is tracked.
             register_new_step_callback=make_step_callback(site.name, last_url, verbose),
         )
 
@@ -790,7 +790,7 @@ async def _scrape_site_once(site: SiteConfig, role: str, search_terms: list[str]
         try:
             final = result.final_result()
         except AttributeError:
-            # Recovered AgentState — grab last extracted content
+            # Recovered AgentState -- grab last extracted content
             try:
                 history = result.history
                 for item in reversed(history):

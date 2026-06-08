@@ -1,8 +1,8 @@
 """
 HR Salary Scraper - Core logic + CLI entry point.
 
-run_scraper()  — importable async function called by Azure Functions triggers
-main()         — CLI entry point (reads argparse + .env)
+run_scraper()  -- importable async function called by Azure Functions triggers
+main()         -- CLI entry point (reads argparse + .env)
 
 Processing order: FIRM-FIRST.
   For each firm (up to `concurrency` at once), all roles are searched sequentially.
@@ -48,7 +48,7 @@ ALL_FIRMS_CONFIG = os.path.join(CONFIG_DIR, "all_firms.json")
 ROLES_CONFIG     = os.path.join(CONFIG_DIR, "roles.json")
 
 
-# ── Config loading ─────────────────────────────────────────────────────────────
+# -- Config loading -------------------------------------------------------------
 
 def load_roles() -> list[str]:
     """Load roles to scrape from config/roles.json."""
@@ -83,7 +83,7 @@ def load_sites(
     return sites
 
 
-# ── Output formatting ──────────────────────────────────────────────────────────
+# -- Output formatting ----------------------------------------------------------
 
 def _firm_lines(firm_name: str, firm_results: list[ScrapeResult], role: str) -> list[str]:
     lines = []
@@ -138,7 +138,7 @@ def _firm_lines(firm_name: str, firm_results: list[ScrapeResult], role: str) -> 
     return lines
 
 
-# ── Firm-first batch runner ────────────────────────────────────────────────────
+# -- Firm-first batch runner ----------------------------------------------------
 
 async def run_batch_firm_first(
     sites: list[SiteConfig],
@@ -157,16 +157,16 @@ async def run_batch_firm_first(
     Process firms concurrently. For each firm, ALL roles are searched sequentially.
 
     Execution pattern (concurrency=3 example):
-        Slot 1: [Firm A] paralegal → litigation → business development
-        Slot 2: [Firm B] paralegal → litigation → business development
-        Slot 3: [Firm C] paralegal → litigation → business development
+        Slot 1: [Firm A] paralegal -> litigation -> business development
+        Slot 2: [Firm B] paralegal -> litigation -> business development
+        Slot 3: [Firm C] paralegal -> litigation -> business development
         (Firm D starts once any slot frees up)
 
-    crawl_storage  : CrawlStorage instance — when set, jobs are upserted to
+    crawl_storage  : CrawlStorage instance -- when set, jobs are upserted to
                      agent_job_results every `save_every_jobs` jobs per role.
     save_every_jobs: upsert each role's crawl doc after this many jobs accumulate.
-                     Default 20 — safe for large runs (no data loss if job crashes mid-run).
-    stop_check     : callable() -> bool — when it returns True, no new firms are started
+                     Default 20 -- safe for large runs (no data loss if job crashes mid-run).
+    stop_check     : callable() -> bool -- when it returns True, no new firms are started
                      and the batch exits after active firms finish their current role.
     """
     semaphore       = asyncio.Semaphore(concurrency)
@@ -180,7 +180,7 @@ async def run_batch_firm_first(
     save_lock   = asyncio.Lock()
 
     # Per-role job buffer for incremental Cosmos upserts
-    # Protected by save_lock — same lock used for pending_save flush
+    # Protected by save_lock -- same lock used for pending_save flush
     role_jobs_buffer: dict[str, list] = {role: [] for role in roles}
 
     if on_progress:
@@ -203,7 +203,7 @@ async def run_batch_firm_first(
         """
         Upsert the crawl doc for a role when its buffer hits save_every_jobs.
         Set force=True to upsert regardless of count (used at end of run).
-        Protected by save_lock — caller must NOT hold save_lock when calling this.
+        Protected by save_lock -- caller must NOT hold save_lock when calling this.
         """
         if not crawl_storage:
             return
@@ -227,7 +227,7 @@ async def run_batch_firm_first(
             return []
 
         async with semaphore:
-            # Re-check after acquiring the slot — stop may have been requested
+            # Re-check after acquiring the slot -- stop may have been requested
             # while this firm was queued waiting for a free slot.
             if stop_check and stop_check():
                 aborted[0] = True
@@ -238,7 +238,7 @@ async def run_batch_firm_first(
 
             firm_results: list[ScrapeResult] = []
 
-            # ── Search each role sequentially within this firm ──
+            # -- Search each role sequentially within this firm --
             for role in roles:
                 if on_progress:
                     on_progress(current_role=role)
@@ -247,7 +247,7 @@ async def run_batch_firm_first(
                 )
                 firm_results.extend(role_results)
 
-            # ── Console one-liner ──
+            # -- Console one-liner --
             done_count[0] += 1
             new_jobs         = sum(1 for r in firm_results if r.status == "success")
             total_jobs_live[0] += new_jobs
@@ -274,15 +274,15 @@ async def run_batch_firm_first(
                     jobs_found_so_far=total_jobs_live[0],
                 )
 
-            # ── Write firm section to output file (all roles grouped) ──
+            # -- Write firm section to output file (all roles grouped) --
             lines: list[str] = [
-                f"\n{'─'*70}",
+                f"\n{'-'*70}",
                 f"  FIRM: {site.name}  ({site.strategy.value})",
-                f"{'─'*70}",
+                f"{'-'*70}",
             ]
             for role in roles:
                 role_results = [r for r in firm_results if r.role_searched == role]
-                lines.append(f"\n  ── Role: {role.upper()} ──")
+                lines.append(f"\n  -- Role: {role.upper()} --")
                 lines.extend(_firm_lines(site.name, role_results, role))
 
             async with file_lock:
@@ -325,7 +325,7 @@ async def run_batch_firm_first(
         else:
             all_results.extend(r)
 
-    # Final flush — save remaining jobs in buffer regardless of count
+    # Final flush -- save remaining jobs in buffer regardless of count
     if pending_save:
         await flush_pending()
     if crawl_storage:
@@ -346,7 +346,7 @@ async def run_batch_firm_first(
     return all_results, aborted[0]
 
 
-# ── Core async function — called by both CLI and Azure Functions ───────────────
+# -- Core async function -- called by both CLI and Azure Functions ---------------
 
 async def run_scraper(
     strategy:     str | None = None,
@@ -394,7 +394,7 @@ async def run_scraper(
     started_at   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     config_label = os.path.basename(firms_config) if firms_config else "all_firms.json"
 
-    # ── Step 1: Load roles + search terms ────────────────────────────────────────
+    # -- Step 1: Load roles + search terms ----------------------------------------
 
     crawl_storage: CrawlStorage | None = None
     role_docs:     list[dict]          = []
@@ -409,11 +409,56 @@ async def run_scraper(
         if not role_docs:
             raise ValueError("No role documents found in the analyses container.")
 
-        roles = [doc["role"] for doc in role_docs]
-        role_search_terms = {
-            doc["role"]: doc.get("similar_roles") or [doc["role"]]
-            for doc in role_docs
-        }
+        # -- Step A: Deduplicate head roles -- merge similar_roles from duplicate docs --
+        # Analyses may have multiple docs for the same role name (e.g. 6x "In-House
+        # Legal Writing Coach").  Union all their similar_roles so no term is lost.
+        merged: dict[str, dict] = {}   # role_name -> { "doc": first_doc, "terms": set }
+        for doc in role_docs:
+            role_name = doc["role"].strip()
+            terms     = set(doc.get("similar_roles") or [role_name])
+            if role_name not in merged:
+                merged[role_name] = {"doc": doc, "terms": terms}
+            else:
+                merged[role_name]["terms"].update(terms)
+
+        # -- Step B: Remove cross-role duplicate search terms ----------------------
+        # If the same term appears under multiple head roles, assign it only to the
+        # first head role that claims it.  Later head roles skip that term entirely
+        # so the crawl is never repeated for the same keyword.
+        # Also remove any similar_role whose name matches another head role -- that
+        # head role will be crawled directly and needs no alias.
+        head_role_keys = {n.lower().strip() for n in merged}  # normalised head names
+        globally_claimed: set[str] = set()                    # terms already assigned
+
+        for role_name, data in merged.items():
+            unique_terms: list[str] = []
+            for t in sorted(data["terms"]):           # sorted for deterministic order
+                t_key = t.lower().strip()
+                if t_key in globally_claimed:          # already owned by an earlier role
+                    continue
+                if t_key in head_role_keys and t_key != role_name.lower().strip():
+                    continue                            # term IS another head role -- skip
+                unique_terms.append(t)
+                globally_claimed.add(t_key)
+            data["terms"] = set(unique_terms)
+
+        roles             = list(merged.keys())
+        role_search_terms = {name: list(data["terms"]) for name, data in merged.items()}
+        role_docs         = [data["doc"] for data in merged.values()]
+
+        # Print clean summary
+        total_raw   = sum(len(d.get("similar_roles") or []) for d in crawl_storage._analyses_cache.values())
+        total_final = sum(len(v) for v in role_search_terms.values())
+        print(f"  Analyses : {len(crawl_storage._analyses_cache)} docs  ->  "
+              f"{len(roles)} unique head roles  |  "
+              f"{total_raw} raw terms  ->  {total_final} unique terms after dedup")
+        print()
+        for name in roles:
+            terms = role_search_terms[name]
+            print(f"    [{name}]  {len(terms)} term(s)")
+            for t in sorted(terms):
+                print(f"      - {t}")
+
         save_storage = None  # results are aggregated per-role and saved after the batch
     else:
         # LOCAL FALLBACK: use roles.json + LLM-generated search terms
@@ -449,9 +494,9 @@ async def run_scraper(
 
     # Write search terms block to output file
     terms_section = [
-        f"\n{'─'*70}",
+        f"\n{'-'*70}",
         f"  SEARCH TERMS (from {'analyses container' if storage_type == 'cosmos' else 'roles.json + LLM'})",
-        f"{'─'*70}",
+        f"{'-'*70}",
     ]
     for role, terms in role_search_terms.items():
         terms_section.append(f"  {role}: {', '.join(terms[:5])}{'...' if len(terms) > 5 else ''}")
@@ -462,17 +507,17 @@ async def run_scraper(
         on_progress(total_roles=len(roles), firms_total=len(sites))
 
     batch_header = (
-        f"\n{'─'*70}\n"
-        f"  Processing {len(sites)} firm(s) × {len(roles)} role(s)  "
+        f"\n{'-'*70}\n"
+        f"  Processing {len(sites)} firm(s) x {len(roles)} role(s)  "
         f"(concurrency={concurrency})\n"
-        f"  Order: firm-first — all roles searched per firm before next firm starts\n"
-        f"{'─'*70}\n"
+        f"  Order: firm-first -- all roles searched per firm before next firm starts\n"
+        f"{'-'*70}\n"
     )
     print(batch_header)
     with open(output_file, "a", encoding="utf-8") as f:
         f.write(batch_header)
 
-    # ── Step 2: Run firm-first batch ─────────────────────────────────────────────
+    # -- Step 2: Run firm-first batch ---------------------------------------------
 
     all_results, was_aborted = await run_batch_firm_first(
         sites             = sites,
@@ -488,18 +533,18 @@ async def run_scraper(
         stop_check        = stop_check,
     )
 
-    # ── Step 3: Build per-role summary + Cosmos save ──────────────────────────────
+    # -- Step 3: Build per-role summary + Cosmos save ------------------------------
 
     summary        = {"started_at": started_at, "roles": [], "aborted": was_aborted}
     total_jobs_all = 0
 
     summary_lines = [
-        f"\n{'─'*70}",
+        f"\n{'-'*70}",
         f"  SUMMARY BY ROLE",
-        f"{'─'*70}",
+        f"{'-'*70}",
     ]
 
-    # Build role→doc_id lookup for analyses updates
+    # Build role->doc_id lookup for analyses updates
     role_to_doc_id = {doc["role"]: doc["id"] for doc in role_docs}
 
     for role in roles:
@@ -556,7 +601,7 @@ async def run_scraper(
         f.write("\n".join(summary_lines) + "\n")
         f.write(footer)
 
-    save_loc   = "Azure Cosmos DB (analyses → agent_job_results)" if crawl_storage else "results.json (local)"
+    save_loc   = "Azure Cosmos DB (analyses -> agent_job_results)" if crawl_storage else "results.json (local)"
     run_label  = "ABORTED" if was_aborted else "Done"
     firms_done = len({r.firm_name for r in all_results})
     print(f"\n{'-'*70}")
@@ -577,7 +622,7 @@ async def run_scraper(
     return summary
 
 
-# ── CLI entry point ────────────────────────────────────────────────────────────
+# -- CLI entry point ------------------------------------------------------------
 
 async def main():
     env_strategy    = os.getenv("STRATEGY",     "videsktop")

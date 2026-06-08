@@ -2,10 +2,10 @@
 Azure Function App entry point.
 
 Functions:
-    scheduled_scrape  — Timer trigger, runs daily at 12:00 AM IST (18:30 UTC)
-    http_trigger      — POST /api/trigger  — starts a run, blocks until done
-    stop_trigger      — POST /api/stop     — abort a running crawl gracefully
-    status_trigger    — GET  /api/status   — check current run progress
+    scheduled_scrape  -- Timer trigger, runs daily at 12:00 AM IST (18:30 UTC)
+    http_trigger      -- POST /api/trigger  -- starts a run, blocks until done
+    stop_trigger      -- POST /api/stop     -- abort a running crawl gracefully
+    status_trigger    -- GET  /api/status   -- check current run progress
 
 Local testing:
     func start
@@ -32,7 +32,7 @@ import azure.functions as func
 
 app = func.FunctionApp()
 
-# ── In-memory run state ────────────────────────────────────────────────────────
+# -- In-memory run state --------------------------------------------------------
 _run_state: dict = {
     "status":      "idle",      # idle | running | aborted | completed | failed
     "started_at":  None,
@@ -53,11 +53,11 @@ _run_state: dict = {
     "error":       None,
 }
 
-# ── Stop flag — set by /api/stop, checked before each new firm starts ──────────
+# -- Stop flag -- set by /api/stop, checked before each new firm starts ----------
 _stop_requested: bool = False
 
 
-# ── Timer trigger — daily at 12:00 AM IST (18:30 UTC) ─────────────────────────
+# -- Timer trigger -- daily at 12:00 AM IST (18:30 UTC) -------------------------
 
 @app.timer_trigger(
     schedule="0 30 18 * * *",
@@ -65,11 +65,11 @@ _stop_requested: bool = False
     run_on_startup=False,
 )
 async def scheduled_scrape(timer: func.TimerRequest) -> None:
-    """Scheduled daily run — reads roles from analyses container."""
+    """Scheduled daily run -- reads roles from analyses container."""
     global _stop_requested
     _stop_requested = False
     if timer.past_due:
-        logging.info("Timer is past due — running now.")
+        logging.info("Timer is past due -- running now.")
     logging.info("Scheduled scrape started.")
     await _execute_scrape(
         strategy     = os.getenv("STRATEGY",    "all"),
@@ -80,7 +80,7 @@ async def scheduled_scrape(timer: func.TimerRequest) -> None:
     logging.info("Scheduled scrape completed.")
 
 
-# ── HTTP trigger — manual start ────────────────────────────────────────────────
+# -- HTTP trigger -- manual start ------------------------------------------------
 
 @app.route(route="trigger", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
 async def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
@@ -136,7 +136,7 @@ async def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
         "error":       None,
     })
 
-    # Fire as background task — return 202 immediately.
+    # Fire as background task -- return 202 immediately.
     # DO NOT use await here: Azure kills the coroutine after the 230s HTTP
     # response timeout, causing the host to recycle and the run to die silently.
     # Background task keeps running as long as the host process stays alive.
@@ -156,7 +156,7 @@ async def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
     )
 
 
-# ── Stop trigger — abort a running crawl ──────────────────────────────────────
+# -- Stop trigger -- abort a running crawl --------------------------------------
 
 @app.route(route="stop", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
 async def stop_trigger(req: func.HttpRequest) -> func.HttpResponse:
@@ -199,7 +199,7 @@ async def stop_trigger(req: func.HttpRequest) -> func.HttpResponse:
     )
 
 
-# ── Status endpoint ────────────────────────────────────────────────────────────
+# -- Status endpoint ------------------------------------------------------------
 
 @app.route(route="status", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 async def status_trigger(req: func.HttpRequest) -> func.HttpResponse:
@@ -211,7 +211,7 @@ async def status_trigger(req: func.HttpRequest) -> func.HttpResponse:
     )
 
 
-# ── Core scrape runner ─────────────────────────────────────────────────────────
+# -- Core scrape runner ---------------------------------------------------------
 
 async def _execute_scrape(strategy: str, site_filter: str, roles, firms_config: str | None = None):
     """Run the scraper and update _run_state on completion or abort."""

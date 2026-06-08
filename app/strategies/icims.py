@@ -1,4 +1,4 @@
-"""Strategy for iCIMS-powered career sites — navigates from the firm's main careers page."""
+"""Strategy for iCIMS-powered career sites -- navigates from the firm's main careers page."""
 
 from typing import List
 from .base import BaseStrategy
@@ -17,21 +17,21 @@ class ICIMSStrategy(BaseStrategy):
 You are on a law firm careers page at {url}.
 Your goal is to find ALL jobs matching "{role}" and extract salary, experience, location, and URL for EVERY match.
 
-STEP 1 — FIND THE STAFF CAREERS SECTION
+STEP 1 -- FIND THE STAFF CAREERS SECTION
 - Look for links labelled: "Professional Staff", "Business Services", "Administrative Staff",
   "Staff Openings", or similar.
 - Do NOT click "Attorneys", "Lawyers", "Associates", or any attorney section.
 - Click the staff section link. It will redirect to an iCIMS portal (.icims.com).
 
-STEP 2 — SEARCH ON ICIMS
-- Classic iCIMS: ALL content is inside an iframe on the page. Look for an iframe —
+STEP 2 -- SEARCH ON ICIMS
+- Classic iCIMS: ALL content is inside an iframe on the page. Look for an iframe --
   ALL interactions (search, job links) must happen INSIDE that iframe.
 - Modern iCIMS (Talent Cloud): no iframe, interact directly.
 - Find the keyword search field, type "{role}", then click Search or press Enter.
 - Wait for results to load.
 - If 0 results, try a shorter keyword.
 
-STEP 3 — COLLECT ALL MATCHING JOBS
+STEP 3 -- COLLECT ALL MATCHING JOBS
 - Read ALL job listings that match "{role}".
 - For each matching job:
   - Click the job title link to open the detail page.
@@ -40,7 +40,7 @@ STEP 3 — COLLECT ALL MATCHING JOBS
   - Continue to the next matching job.
 - Collect up to 10 matching jobs.
 
-STEP 4 — EXTRACT FROM EACH JOB DETAIL
+STEP 4 -- EXTRACT FROM EACH JOB DETAIL
 For each job, extract:
 - Job title: main heading at the top
 - Salary: search the full description text for "$X,XXX - $Y,XXX" or "$XX/hr". Use "Not listed" if absent.

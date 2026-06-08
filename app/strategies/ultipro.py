@@ -1,4 +1,4 @@
-"""Strategy for UltiPro / UKG career sites — navigates from the firm's main careers page."""
+"""Strategy for UltiPro / UKG career sites -- navigates from the firm's main careers page."""
 
 from typing import List
 from .base import BaseStrategy
@@ -17,20 +17,20 @@ class UltiProStrategy(BaseStrategy):
 You are on a law firm careers page at {url}.
 Your goal is to find ALL jobs matching "{role}" and extract salary, experience, location, and URL for EVERY match.
 
-STEP 1 — FIND THE STAFF CAREERS SECTION
+STEP 1 -- FIND THE STAFF CAREERS SECTION
 - Look for links labelled: "Professional Staff", "Business Professionals",
   "Staff Openings", "US Professional Staff", or similar.
 - Do NOT click "Attorneys", "Lawyers", "Associates", or any attorney section.
 - Click the staff link (e.g. "View Open Positions"). It will redirect to UltiPro/UKG
   (URL contains "recruiting.ultipro.com").
 
-STEP 2 — SEARCH ON ULTIPRO
+STEP 2 -- SEARCH ON ULTIPRO
 - This is a KnockoutJS application. Wait 4 seconds for job cards to finish loading.
 - Find the search box (id: SearchInput) and type "{role}", then press Enter.
 - Wait for job cards to refresh.
 - If 0 results, try a shorter keyword.
 
-STEP 3 — COLLECT ALL MATCHING JOBS
+STEP 3 -- COLLECT ALL MATCHING JOBS
 - Read ALL job cards visible that match "{role}".
 - For each matching card:
   - Click the job title link to open the detail page.
@@ -39,11 +39,11 @@ STEP 3 — COLLECT ALL MATCHING JOBS
   - Continue to the next matching card.
 - Collect up to 10 matching jobs.
 
-STEP 4 — EXTRACT FROM EACH JOB DETAIL
+STEP 4 -- EXTRACT FROM EACH JOB DETAIL
 For each job, extract:
 - Job title: heading near the top
 - Salary: check page source for JSON-LD block (type="application/ld+json") with
-  baseSalary.minValue and maxValue — most reliable. If absent, scan description
+  baseSalary.minValue and maxValue -- most reliable. If absent, scan description
   for "$X,XXX" or "$XX/hr" patterns. Use "Not listed" if absent.
 - Experience: in "Requirements" or "Qualifications"
 - Location: "City, State" pattern near title

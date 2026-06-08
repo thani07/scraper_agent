@@ -57,7 +57,7 @@ Invoke-RestMethod -Uri "https://hr-salary-scraper-fn.azurewebsites.net/api/statu
 
 Every time you change any code, rebuild and push the Docker image, then restart the Function App.
 
-### Step 1 — Login to ACR (only needed once per session)
+### Step 1 -- Login to ACR (only needed once per session)
 ```
 az acr login --name hrscraperregistry
 ```
@@ -67,27 +67,27 @@ az acr credential show --name hrscraperregistry --query "passwords[0].value" -o 
 docker login hrscraperregistry.azurecr.io -u hrscraperregistry
 ```
 
-### Step 2 — Build the image
+### Step 2 -- Build the image
 ```
 docker build -t hr-scraper:latest .
 ```
 
-### Step 3 — Tag the image
+### Step 3 -- Tag the image
 ```
 docker tag hr-scraper:latest hrscraperregistry.azurecr.io/hr-scraper:latest
 ```
 
-### Step 4 — Push to ACR
+### Step 4 -- Push to ACR
 ```
 docker push hrscraperregistry.azurecr.io/hr-scraper:latest
 ```
 
-### Step 5 — Restart the Function App to pull the new image
+### Step 5 -- Restart the Function App to pull the new image
 ```
 az functionapp restart --name hr-salary-scraper-fn --resource-group AF-Innov-AFSChat-Prd
 ```
 
-### Step 6 — Verify it's running
+### Step 6 -- Verify it's running
 ```
 az functionapp show --name hr-salary-scraper-fn --resource-group AF-Innov-AFSChat-Prd --query "state" -o tsv
 ```
@@ -106,7 +106,7 @@ Then rebuild and push (Steps 2-5 above).
 
 ## How to Add / Change Firms
 
-Edit `config/all_firms.json` — add a new entry following the existing format:
+Edit `config/all_firms.json` -- add a new entry following the existing format:
 ```json
 {
   "name": "Firm Name",
@@ -137,7 +137,7 @@ Then rebuild and push (Steps 2-5 above).
 | `COSMOS_CONTAINER` | Container name (`agent_job_results`) |
 
 To update a variable:
-**Azure Portal** → `hr-salary-scraper-fn` → **Configuration** → **Application settings** → edit → **Save**
+**Azure Portal** -> `hr-salary-scraper-fn` -> **Configuration** -> **Application settings** -> edit -> **Save**
 
 ---
 
@@ -147,4 +147,4 @@ To update a variable:
 az functionapp logs tail --name hr-salary-scraper-fn --resource-group AF-Innov-AFSChat-Prd
 ```
 
-Or in Azure Portal → `hr-salary-scraper-fn` → **Log stream**
+Or in Azure Portal -> `hr-salary-scraper-fn` -> **Log stream**

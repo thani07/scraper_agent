@@ -1,4 +1,4 @@
-"""Strategy registry — maps ATS type to strategy class."""
+"""Strategy registry -- maps ATS type to strategy class."""
 
 from app.models import ATSStrategy
 from .base import BaseStrategy
