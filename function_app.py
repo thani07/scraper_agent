@@ -201,11 +201,76 @@ async def stop_trigger(req: func.HttpRequest) -> func.HttpResponse:
 
 # -- Status endpoint ------------------------------------------------------------
 
+def _fmt_duration(seconds: float) -> str:
+    """Convert seconds to human-readable string: '1h 23m 45s'."""
+    seconds = int(seconds)
+    h, rem  = divmod(seconds, 3600)
+    m, s    = divmod(rem, 60)
+    if h:
+        return f"{h}h {m:02d}m {s:02d}s"
+    if m:
+        return f"{m}m {s:02d}s"
+    return f"{s}s"
+
+
 @app.route(route="status", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 async def status_trigger(req: func.HttpRequest) -> func.HttpResponse:
-    """Return current run state including live progress."""
+    """Return current run state including live elapsed time and ETA."""
+    import copy
+
+    state = copy.deepcopy(_run_state)
+    timing: dict = {}
+
+    started_at  = state.get("started_at")
+    finished_at = state.get("finished_at")
+    status      = state.get("status")
+
+    if started_at:
+        try:
+            from datetime import timezone as _tz
+            start_dt = datetime.fromisoformat(started_at)
+
+            if finished_at:
+                # Run is done -- show total duration
+                end_dt      = datetime.fromisoformat(finished_at)
+                elapsed_sec = (end_dt - start_dt).total_seconds()
+                timing["elapsed"]        = _fmt_duration(elapsed_sec)
+                timing["elapsed_sec"]    = round(elapsed_sec, 1)
+                timing["total_duration"] = _fmt_duration(elapsed_sec)
+
+            elif status == "running":
+                # Run is live -- compute elapsed + ETA
+                now         = datetime.now(_tz.utc)
+                elapsed_sec = (now - start_dt).total_seconds()
+                timing["elapsed"]     = _fmt_duration(elapsed_sec)
+                timing["elapsed_sec"] = round(elapsed_sec, 1)
+
+                p           = state.get("progress", {})
+                firms_done  = p.get("firms_done",  0)
+                firms_total = p.get("firms_total", 0)
+
+                if firms_done > 0 and firms_total > 0:
+                    avg_per_firm       = elapsed_sec / firms_done
+                    firms_remaining    = firms_total - firms_done
+                    eta_sec            = avg_per_firm * firms_remaining
+                    pct                = round((firms_done / firms_total) * 100, 1)
+                    eta_dt             = now + __import__("datetime").timedelta(seconds=eta_sec)
+
+                    timing["avg_sec_per_firm"]   = round(avg_per_firm, 1)
+                    timing["firms_remaining"]     = firms_remaining
+                    timing["eta"]                 = _fmt_duration(eta_sec)
+                    timing["eta_sec"]             = round(eta_sec, 1)
+                    timing["estimated_finish_at"] = eta_dt.isoformat()
+                    timing["percent_complete"]    = pct
+                else:
+                    timing["eta"] = "calculating..."
+        except Exception:
+            pass
+
+    state["timing"] = timing
+
     return func.HttpResponse(
-        json.dumps(_run_state, indent=2),
+        json.dumps(state, indent=2),
         status_code=200,
         mimetype="application/json",
     )

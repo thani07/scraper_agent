@@ -1,7 +1,7 @@
 [
   {
     "name": "Accenture",
-    "careers_url": "https://www.accenture.com/us-en/careers/jobsearch",
+    "careers_url": "https://www.accenture.com/us-en",
     "strategy": "direct",
     "navigation_hints": "Loads Accenture's global homepage, clicks the Careers nav button, then clicks 'Search for jobs' to land on the job search page. Fills the search bar (clicking the overlay div , then typing), presses Enter. Iterates job cards (div.rad-filters-vertical__job-card-header): clicks each to expand, finds 'Read full job description' link for the canonical detail URL. Handles 'Load more' pagination. Salary extracted from a per-location table on the detail page matching 'Annual Salary Range'."
   },
@@ -13,13 +13,19 @@
   },
   {
     "name": "Alston & Bird",
-    "careers_url": "https://www.alston.com/en/careers/professional-staff/overview",
-    "strategy": "workday",
+    "careers_url": "https://www.alston.com/en/careers/staff-opportunities",
+    "strategy": "direct",
     "navigation_hints": "Navigates to Alston's own job listing page at /en/careers/attorneys-and-patent-professionals/job-opportunities/, dismisses 'Reject Non-Necessary Cookies' banner, clicks 'LOAD MORE' until all results are loaded, then filters using the 'SEARCH BY NAME' input. Collects all job links under the job-opportunities path, visits each detail page, and extracts title from the HTML <title> tag (first segment before '|') and location from the content block after the LinkedIn share <ul>."
   },
   {
+    "name": "Alston & Bird (Workday)",
+    "careers_url": "https://www.alston.com/en/careers",
+    "strategy": "workday",
+    "navigation_hints": "Loads the Workday portal directly at alston.wd1.myworkdayjobs.com/ExternalCareer. Searches by keyword , collects job card labels, filters by role, then clicks each card to update the right detail panel. Location is read from [locations] and 'additionalLocations' within the jobDetails panel; 'View All N Locations' is clicked to reveal all offices. Salary from compensation/salaryRange automation-id attributes or dollar-range regex on full text."
+  },
+  {
     "name": "Bain & Company",
-    "careers_url": "https://www.bain.com/careers/find-a-role/",
+    "careers_url": "https://www.bain.com/careers/",
     "strategy": "direct",
     "navigation_hints": "Starts on Bain's careers homepage, clicks 'FIND JOBS' (a.btn), opens the Locations filter (h5.feed-filter-block__title), checks US office checkboxes from a predefined set of cities (Atlanta, Boston, Chicago, etc.) inside the 'North & Latin America' column only. Optionally types a keyword. Collects job cards (div.card__wrapper) with title (h4), category, offices (div.card--role-results__region li), and parent <a> href. Handles 'Load more' pagination. Visits detail pages for salary."
   },
@@ -31,57 +37,57 @@
   },
   {
     "name": "Boston Consulting Group",
-    "careers_url": "https://careers.bcg.com/global/en/search-results",
+    "careers_url": "https://careers.bcg.com/global/en/locations/united-states",
     "strategy": "direct",
     "navigation_hints": "Starts on the BCG US locations page, clicks the Search button (button#ph-search-backdrop), expands the 'Country/Region' accordion, checks 'United States of America', then types the role into input#subSearchTextbox. Collects a.apply-btn elements: builds the canonical detail URL from data-ph-tevent-attr-trait5 (job code). Visits each detail page for title, location, salary (only $XX,XXX+ amounts). Handles 'Load more' pagination."
   },
   {
     "name": "Cooley LLP",
-    "careers_url": "https://www.cooley.com/careers/business-professionals-and-paralegals/business-professionals-paralegal-openings",
+    "careers_url": "https://www.cooley.com/careers",
     "strategy": "workday",
     "navigation_hints": "Loads the Workday portal directly at cooley.wd1.myworkdayjobs.com/Cooley_US_LLP. Searches by keyword in the standard Workday search box, collects all job card titles (a[[jobTitle]]), filters by role keywords, then clicks each card to update the right detail panel. Reads location from [locations]/'additionalLocations' in the jobDetails panel, clicks 'View All N Locations' if present. Salary from compensation/salaryRange automation-id or dollar regex."
   },
   {
     "name": "Davis Polk",
-    "careers_url": "https://www.davispolk.com/careers/business-professionals",
+    "careers_url": "https://www.davispolk.com/careers/overview",
     "strategy": "workday",
     "navigation_hints": "Navigates the Davis Polk careers overview page, then goes directly to the Workday portal at davispolk.wd5.myworkdayjobs.com/business-professionals-services-usa. Searches by keyword in the Workday search box, clicks each matching job card to update the right panel, extracts title from jobPostingTitle automation-id, location from the locations/additionalLocations containers, and salary from compensation/salaryRange attributes or dollar regex."
   },
   {
     "name": "Dechert",
-    "careers_url": "https://www.dechert.com/careers/business-services-professionals.html",
+    "careers_url": "https://www.dechert.com/people/careers.html",
     "strategy": "workday",
     "navigation_hints": "Loads the Workday portal directly at dechert.wd12.myworkdayjobs.com/DechertCareers. Searches by keyword (dropping attorney/lawyer/counsel stop words), collects job card labels, filters by role, clicks each card to update the right detail panel. Location read from [locations] and 'additionalLocations' in the jobDetails panel. Salary from compensation or salaryRange automation-id or dollar regex."
   },
   {
     "name": "Deloitte",
-    "careers_url": "https://www.deloitte.com/us/en/careers/experienced-professionals.html?icid=top_experienced-professionals",
+    "careers_url": "https://www.deloitte.com/us/en.html?icid=site_selector_us",
     "strategy": "direct",
     "navigation_hints": "Starts on Deloitte's US homepage, clicks Careers in the primary nav, clicks 'Job search' sub-link to open apply.deloitte.com in a new tab, then clicks 'Search jobs' for experienced professionals. Types the role keyword in the search input. Iterates article.article--result job cards for title (h3 a.link), company (first subtitle span), and location (last subtitle span). Visits each detail page for salary. Handles next-page pagination via the results list."
   },
   {
     "name": "DLA Piper",
-    "careers_url": "https://www.dlapiper.com/en-us/careers/business-professionals",
+    "careers_url": "https://www.dlapiper.com/en-us/careers",
     "strategy": "workday",
     "navigation_hints": "Loads the Workday portal directly at dlapiper.wd1.myworkdayjobs.com/dlapiper. Searches by keyword , collects job card labels, filters by role, clicks each card to update the right detail panel. Location read from [locations]/'additionalLocations' in the jobDetails panel; work type (Hybrid/Full time) filtered out via the Salary from compensation/salaryRange attributes or inline dollar regex."
   },
   {
     "name": "EY",
-    "careers_url": "https://www.ey.com/en_us/careers/experienced-professionals",
+    "careers_url": "https://www.ey.com/en_us/careers",
     "strategy": "direct",
-    "navigation_hints": "Go down and there will be Ready to apply in that we need to click the experienced professionals and then it will open a new tab with the job listings. Then we can search for the role and location and then click on the job listing to get the details and salary information."
+    "navigation_hints": "Starts on ey.com/en_us/careers, clicks 'Careers' top nav, then 'Job search', then 'Experienced' to reach careers.ey.com. On the portal, clicks 'More options' to reveal country filter, selects 'United States' from the country dropdown, fills the keyword search box, and submits. Collects job cards with pagination. Visits each detail page for title, location, and salary. Career portal is careers.ey.com."
   },
   {
     "name": "Foley & Lardner",
-    "careers_url": "https://www.foley.com/careers/business-professionals-and-paralegals/",
+    "careers_url": "https://www.foley.com/careers/",
     "strategy": "icims",
     "navigation_hints": "Starts on Foley's careers page, navigates to the iCIMS portal at careers-foley.icims.com with a keyword in the searchKeyword param. All content lives inside an iframe named 'icims_content_iframe'. Collects job links from the iframe DOM, visits each detail page to extract title, location, and salary. Keyword search is done via URL param."
   },
   {
     "name": "Gibson Dunn",
-    "careers_url": "https://www.gibsondunn.com/careers/staff/",
+    "careers_url": "https://www.gibsondunn.com/careers/",
     "strategy": "direct",
-    "navigation_hints": "Go down you will see the current opportunities in that near find your next opportunity we need to click the view all when we click that lisiting will be available in the same page then we can search for the role and location and then click on the job listing to get the details and salary information."
+    "navigation_hints": "Uses a 4-step wizard on the Gibson Dunn careers site: navigates Office → Practice Area → Positions. The listing page renders all global jobs in static HTML regardless of filter selections; city abbreviations in job titles (NY, DC, SF, LA) are used for location matching. Collects job links, visits each detail page for salary and experience."
   },
   {
     "name": "Goodwin Law",
@@ -103,7 +109,7 @@
   },
   {
     "name": "Hogan Lovells",
-    "careers_url": "https://www.hoganlovells.com/en/global-careers/experienced-lawyers",
+    "careers_url": "https://www.hoganlovells.com/en/global-careers",
     "strategy": "workday",
     "navigation_hints": "Loads the Workday portal directly at hoganlovells.wd3.myworkdayjobs.com/Search with a US location country pre-filter. Searches by keyword, clicks each matching job card to update the right detail panel, reads location from locations/additionalLocations automation-id containers, and salary from compensation/salaryRange attributes."
   },
@@ -115,27 +121,33 @@
   },
   {
     "name": "Kobre & Kim",
-    "careers_url": "https://www.kpmguscareers.com/experienced/",
+    "careers_url": "https://kobrekim.wd1.myworkdayjobs.com/KobreKim_Attorney_External_Careers",
+    "strategy": "workday",
+    "navigation_hints": "Loads the Workday portal directly at kobrekim.wd1.myworkdayjobs.com/KobreKim_Attorney_External_Careers. Searches by keyword, clicks each matching card to update the right detail panel. Location and salary extracted from standard Workday."
+  },
+  {
+    "name": "KPMG",
+    "careers_url": "https://www.kpmguscareers.com/",
     "strategy": "direct",
-    "navigation_hints": "you will see the search experienced professional and then you need to clcik that then the websites will be open directly lisiting page use that "
+    "navigation_hints": "Starts on the KPMG US careers site at kpmguscareers.com, navigates to the job search page at /job-search/, and applies keyword and location filters. Collects job cards and visits each detail page for salary and description."
   },
   {
     "name": "King & Spalding",
-    "careers_url": "https://www.kslaw.com/pages/business-professionals",
+    "careers_url": "https://www.kslaw.com/pages/careers",
     "strategy": "workday",
-    "navigation_hints": "you will be dropped to the buisness professional page then you need to click the current opportunities then it goes to workday thats it"
+    "navigation_hints": "Loads the Workday portal directly at kslaw.wd1.myworkdayjobs.com/careers. Searches by keyword , collects job card labels, clicks each card to update the right detail panel. Location from locations/additionalLocations automation-id, salary from compensation/salaryRange or dollar regex."
   },
   {
     "name": "Latham & Watkins",
-    "careers_url": "https://www.lwcareers.com/en/professional-staff-paralegals",
+    "careers_url": "https://www.lw.com/en/careers/professional-staff",
     "strategy": "icims",
-    "navigation_hints": "it will show Choose a region to explore career opportunities at Latham. you need to choose united states and then when we click that it goes to the icims portal and then you can search for the role and location and then click on the job listing to get the details and salary information."
+    "navigation_hints": "Navigates to the iCIMS portal at us-associatecareers-lw.icims.com for the keyword search. Content is inside an iframe (#icims_content_iframe). Searches by keyword, collects job links from the iframe, and visits each detail page to extract title, location, and salary."
   },
   {
     "name": "McDermott Will & Emery",
     "careers_url": "https://careers.mcdermottlaw.com/",
     "strategy": "workday",
-    "navigation_hints": "down you need to choose buisness professionals and then it will open the workday portal then you need to search the jobs"
+    "navigation_hints": "Loads the Workday portal directly at mwe.wd5.myworkdayjobs.com/mwe_careers. Searches by keyword , collects job card labels, clicks each card to update the right detail panel. Location from locations/additionalLocations automation-id, salary from compensation/salaryRange or dollar regex in page text."
   },
   {
     "name": "McKinsey & Company",
@@ -151,9 +163,9 @@
   },
   {
     "name": "Munger, Tolles & Olson",
-    "careers_url": "https://www.mto.com/lateral-lawyers/",
-    "strategy": "videsktop",
-    "navigation_hints": "scroll down you will see a Applicants near you need to click the apply now then it goes to videsktop"
+    "careers_url": "https://www.mto.com/culture/",
+    "strategy": "workday",
+    "navigation_hints": "Loads the Workday portal directly at mto.wd503.myworkdayjobs.com/MTO_Careers. Searches by keyword , collects job card labels, clicks each card to update the right detail panel. Location from locations/additionalLocations automation-id containers, salary from compensation/salaryRange or dollar regex."
   },
   {
     "name": "Perkins Coie",

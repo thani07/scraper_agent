@@ -244,6 +244,78 @@ def _ensure_required_fields(data: dict, fallback_url: str) -> dict:
     return data
 
 
+def _normalize_salary(extraction: "JobExtraction") -> "JobExtraction":
+    """
+    Post-process salary fields after LLM extraction.
+
+    Priority rule:
+      - Both annual AND hourly info present in salary_raw -> use annual, is_hourly=False
+      - Only hourly present                              -> is_hourly=True
+      - Only annual present                              -> is_hourly=False
+
+    Safety net:
+      - If is_hourly=True but salary_min/max values are clearly annual (>=1000)
+        the LLM misclassified -- correct is_hourly to False.
+    """
+    import re as _re
+
+    raw = (extraction.salary_raw or "").lower()
+
+    annual_keywords = ["per year", "/year", "annually", "annual", "per annum", "a year", "yearly"]
+    hourly_keywords = ["/hr", "/hour", "per hour", "hourly", "an hour", "/h "]
+
+    has_annual = any(kw in raw for kw in annual_keywords)
+    has_hourly = any(kw in raw for kw in hourly_keywords)
+
+    def _looks_annual(val: str | None) -> bool:
+        """Return True if the salary string represents an annual figure (>=1000)."""
+        if not val:
+            return False
+        digits = _re.sub(r"[^\d.]", "", val)
+        try:
+            return float(digits) >= 1000
+        except Exception:
+            return False
+
+    if has_annual and has_hourly:
+        # Both present -- prefer annual.
+        # Try to re-extract the annual figures from salary_raw.
+        matches = _re.findall(
+            r"\$?([\d,]+(?:\.\d+)?)\s*([Kk])?\s*"
+            r"(?:per year|/year|annually|annual|per annum|a year|yearly)",
+            extraction.salary_raw or "",
+            _re.IGNORECASE,
+        )
+        if matches:
+            values = []
+            for num_str, k_suffix in matches:
+                try:
+                    val = float(num_str.replace(",", ""))
+                    if k_suffix:
+                        val *= 1000
+                    values.append(f"${val:,.0f}")
+                except Exception:
+                    pass
+            if values:
+                extraction.salary_min = values[0]
+                extraction.salary_max = values[-1] if len(values) > 1 else None
+        extraction.is_hourly = False
+
+    elif has_annual and not has_hourly:
+        extraction.is_hourly = False
+
+    elif has_hourly and not has_annual:
+        extraction.is_hourly = True
+
+    # Safety net: is_hourly=True but values are clearly annual numbers -> correct it
+    if extraction.is_hourly and (
+        _looks_annual(extraction.salary_min) or _looks_annual(extraction.salary_max)
+    ):
+        extraction.is_hourly = False
+
+    return extraction
+
+
 def _find_json_arrays(text: str) -> list:
     """
     Extract all top-level JSON arrays from a string using bracket matching.
@@ -311,8 +383,10 @@ def parse_multi_extraction(
             if isinstance(job, dict) and "role_title" in job:
                 try:
                     results.append(
-                        JobExtraction.model_validate(
-                            _ensure_required_fields(job, fallback_url)
+                        _normalize_salary(
+                            JobExtraction.model_validate(
+                                _ensure_required_fields(job, fallback_url)
+                            )
                         )
                     )
                 except Exception:
@@ -326,8 +400,10 @@ def parse_multi_extraction(
             if isinstance(job, dict) and "role_title" in job:
                 try:
                     results.append(
-                        JobExtraction.model_validate(
-                            _ensure_required_fields(job, fallback_url)
+                        _normalize_salary(
+                            JobExtraction.model_validate(
+                                _ensure_required_fields(job, fallback_url)
+                            )
                         )
                     )
                 except Exception:
@@ -406,7 +482,7 @@ def parse_extraction(raw_result: str, fallback_role: str, fallback_url: str) -> 
     # 1. Direct parse -- fastest path when the LLM returns clean JSON
     data = _try_parse(text)
     if data:
-        return JobExtraction.model_validate(_ensure_required_fields(data, fallback_url))
+        return _normalize_salary(JobExtraction.model_validate(_ensure_required_fields(data, fallback_url)))
 
     # 2. Markdown code block -- LLM sometimes wraps output in ```json ... ```
     import re
@@ -415,7 +491,7 @@ def parse_extraction(raw_result: str, fallback_role: str, fallback_url: str) -> 
         if m:
             data = _try_parse(m.group(1))
             if data:
-                return JobExtraction.model_validate(_ensure_required_fields(data, fallback_url))
+                return _normalize_salary(JobExtraction.model_validate(_ensure_required_fields(data, fallback_url)))
 
     # 3. Bracket-matching finder -- handles JSON embedded inside prose text.
     #    Also covers cases where experience_raw / salary_raw contain literal newlines
@@ -423,7 +499,7 @@ def parse_extraction(raw_result: str, fallback_role: str, fallback_url: str) -> 
     for candidate in _find_json_objects(text):
         data = _try_parse(candidate)
         if data:
-            return JobExtraction.model_validate(_ensure_required_fields(data, fallback_url))
+            return _normalize_salary(JobExtraction.model_validate(_ensure_required_fields(data, fallback_url)))
 
     # 4. Last resort -- parsing truly failed; store raw text in salary_raw for debugging
     return JobExtraction(

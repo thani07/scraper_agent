@@ -39,7 +39,7 @@ load_dotenv()
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "false")
 
 from app.models import SiteConfig, ScrapeResult
-from app.scraper import scrape_site, generate_search_terms
+from app.scraper import scrape_site
 from app.storage import CosmosStorage, LocalStorage, CrawlStorage, _generate_crawl_id, _build_crawl_job
 
 
