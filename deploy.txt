@@ -1,0 +1,24 @@
+function app   : hr-salary-scraper-fn
+registry        : hrscraperregistry.azurecr.io
+resource group  : AF-Innov-AFSChat-Prd
+
+docker command :
+
+az acr login --name hrscraperregistry
+
+docker build -t hr-scraper:latest .
+
+docker tag hr-scraper:latest hrscraperregistry.azurecr.io/hr-scraper:latest
+
+docker push hrscraperregistry.azurecr.io/hr-scraper:latest
+
+az functionapp restart --name hr-salary-scraper-fn --resource-group AF-Innov-AFSChat-Prd
+
+
+#powershell command trigger :
+
+Invoke-RestMethod -Method POST -Uri "https://hr-salary-scraper-fn.azurewebsites.net/api/trigger" -ContentType "application/json" -Body '{}'
+
+Invoke-RestMethod -Uri "https://hr-salary-scraper-fn.azurewebsites.net/api/status"
+
+Invoke-RestMethod -Method POST -Uri "https://hr-salary-scraper-fn.azurewebsites.net/api/stop"

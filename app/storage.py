@@ -47,6 +47,7 @@ def _build_crawl_job(result: ScrapeResult, role: str) -> dict:
         "salary_min":     e.salary_min if e else None,
         "salary_max":     e.salary_max if e else None,
         "url":            e.job_url if e else None,
+        "description":    e.description if e else None,
         "cached_at":      datetime.now(timezone.utc).isoformat(),
     }
 
