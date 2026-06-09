@@ -66,17 +66,38 @@ _stop_requested: bool = False
 )
 async def scheduled_scrape(timer: func.TimerRequest) -> None:
     """Scheduled daily run -- reads roles from analyses container."""
-    global _stop_requested
+    global _stop_requested, _run_state
     _stop_requested = False
+
+    strategy     = os.getenv("STRATEGY",    "all")
+    site_filter  = os.getenv("SITE_FILTER", "all")
+    firms_config = os.getenv("FIRMS_CONFIG") or None
+
+    # Set run state to running -- same as http_trigger does
+    _run_state.update({
+        "status":      "running",
+        "started_at":  datetime.now(timezone.utc).isoformat(),
+        "finished_at": None,
+        "strategy":    strategy,
+        "filter":      site_filter,
+        "roles":       [],
+        "progress": {
+            "current_role":      None,
+            "role_index":        0,
+            "total_roles":       0,
+            "current_firm":      None,
+            "firms_done":        0,
+            "firms_total":       0,
+            "jobs_found_so_far": 0,
+        },
+        "summary":     None,
+        "error":       None,
+    })
+
     if timer.past_due:
         logging.info("Timer is past due -- running now.")
     logging.info("Scheduled scrape started.")
-    await _execute_scrape(
-        strategy     = os.getenv("STRATEGY",    "all"),
-        site_filter  = os.getenv("SITE_FILTER", "all"),
-        roles        = None,
-        firms_config = os.getenv("FIRMS_CONFIG") or None,
-    )
+    await _execute_scrape(strategy, site_filter, None, firms_config)
     logging.info("Scheduled scrape completed.")
 
 
